@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "X Auto Ad Blocker",
+    "version": "1.0",
+    "description": "Automatically blocks advertisers you encounter while browsing on X (Twitter).",
+    "permissions": [
+        "activeTab"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "*://x.com/*",
+                "*://twitter.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
+}
