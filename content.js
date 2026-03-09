@@ -1,320 +1,490 @@
 (function () {
-    // Inject a CSS style tag to hide the Dropdown Menu and Confirmation Modals from the user 
-    // during the ad-blocking process, preserving visual aesthetics.
-    // data-testid="Dropdown" -> Menu opened after clicking the 3 dots
-    // data-testid="confirmationSheetDialog" -> Main confirmation modal ("Are you sure?")
-    // r-11z020y / mask -> Background overlay layer when the modal is open
-    const style = document.createElement('style');
-    style.innerHTML = `
-        body.x-ad-blocking-active div[data-testid="Dropdown"], 
-        body.x-ad-blocking-active div[data-testid="confirmationSheetDialog"], 
-        body.x-ad-blocking-active div[data-testid="mask"] {
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-            transition: none !important;
-        }
-    `;
-    document.head.appendChild(style);
+    'use strict';
 
-    // To prevent scroll issues when up popping widgets close
-    // We clear overflow properties from the body so X's native CSS takes over again.
+    // =========================================================================
+    // STYLES
+    // =========================================================================
+
+    function injectStyles() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            body.x-ad-blocking-active div[data-testid="Dropdown"],
+            body.x-ad-blocking-active div[data-testid="confirmationSheetDialog"],
+            body.x-ad-blocking-active div[data-testid="mask"] {
+                opacity:0!important; visibility:hidden!important;
+                pointer-events:none!important; transition:none!important;
+            }
+            [data-testid="download-media"]:hover > div { color:rgb(29,155,240)!important; }
+            [data-testid="download-media"]:hover .r-1p0dtai { background-color:rgba(29,155,240,0.1)!important; }
+            [data-testid="download-media"]:hover svg path { fill:rgb(29,155,240)!important; }
+            [data-testid="download-media"] { background:none; border:none; padding:0; cursor:pointer; }
+            [data-testid="download-media"][data-loading="true"] {
+                opacity:0.35!important; pointer-events:none!important;
+            }
+        `;
+        (document.head || document.documentElement).appendChild(style);
+    }
+    injectStyles();
+
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
     function releaseBodyScroll() {
         document.body.style.overflow = '';
         document.body.style.overscrollBehaviorY = '';
-
-        // Sometimes the X platform leaves behind injected styles (e.g., width: calc(100% - 15px) etc.)
-        // Clearing these padding and margin additions prevents the double scrollbar bug.
         document.body.style.paddingRight = '';
         document.body.style.marginRight = '';
     }
 
-    // Supported ad labels (English and Turkish primarily, can be extended)
-    const AD_LABELS = ["Reklam", "Ad", "Promoted"];
+    // =========================================================================
+    // TOAST
+    // =========================================================================
 
-    // Lock to prevent concurrent blocking operations
-    let isBlocking = false;
-
-    async function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    function showToast(htmlMsg, iconType = 'block', bgColor = '#1da1f2') {
+        const old = document.getElementById('x-adb-toast');
+        if (old) old.remove();
+        const icons = {
+            block:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+            download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16.59l-5.7-5.7 1.41-1.42L11 12.76V3h2v9.76l3.3-3.3 1.41 1.42L12 16.59zM3 21v-3.5h2V19h14v-1.5h2V21H3z"/></svg>`,
+            warning:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+        };
+        const toast = document.createElement('div');
+        toast.id = 'x-adb-toast';
+        toast.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">${icons[iconType]||''}<span>${htmlMsg}</span></div>`;
+        Object.assign(toast.style, {
+            position:'fixed', bottom:'24px', right:'24px',
+            backgroundColor:bgColor, color:'#fff',
+            padding:'12px 16px', borderRadius:'50px',
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+            fontSize:'14px', fontWeight:'500',
+            boxShadow:'0 4px 14px rgba(0,0,0,.15)',
+            zIndex:'999999', opacity:'0', transform:'translateY(20px)',
+            transition:'all .3s cubic-bezier(.25,.8,.25,1)', pointerEvents:'none'
+        });
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => { toast.style.opacity='1'; toast.style.transform='translateY(0)'; });
+        setTimeout(() => {
+            toast.style.opacity='0'; toast.style.transform='translateY(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
     }
 
-    // Interaction shield to prevent the user from accidentally clicking elsewhere 
-    // and disrupting the Twitter menus during the automated blocking process
-    function blockUserInteractions() {
-        let shield = document.getElementById("x-ad-blocker-shield");
-        if (!shield) {
-            shield = document.createElement("div");
-            shield.id = "x-ad-blocker-shield";
-            Object.assign(shield.style, {
-                position: "fixed",
-                top: "0",
-                left: "0",
-                width: "100vw",
-                height: "100vh",
-                zIndex: "2147483647", // Maximum z-index (on top of everything)
-                background: "transparent",
-                cursor: "default"
-            });
-            document.body.appendChild(shield);
+    // =========================================================================
+    // TWEET STATUS ID EXTRACTION
+    // =========================================================================
+
+    function getTweetStatusId(tweetElement) {
+        const timeLink = tweetElement.querySelector('time')?.closest('a[href*="/status/"]');
+        if (timeLink) {
+            const m = timeLink.getAttribute('href').match(/\/status\/(\d+)/);
+            if (m) return m[1];
         }
-        shield.style.display = "block";
-        document.body.classList.add("x-ad-blocking-active");
+        for (const a of tweetElement.querySelectorAll('a[href*="/status/"]')) {
+            const m = a.getAttribute('href').match(/\/status\/(\d+)/);
+            if (m) return m[1];
+        }
+        return null;
+    }
+
+    // =========================================================================
+    // FILE NAMING
+    //
+    // FIX 1 - Double extension:
+    //   URL path ends in "HC7GTvMXwAEdBZA.mp4" - we must NOT add ".mp4" again.
+    //   Solution: strip any existing extension from the basename before appending.
+    //
+    // FIX 2 - GIF detection:
+    //   X stores GIFs as MP4 under the /tweet_video/ path.
+    //   We save them as .gif so the user's file manager treats them correctly.
+    //   (The file content is valid MP4/H.264, but browsers & most viewers open
+    //   them fine. If you prefer keeping .mp4 just remove the gif branch.)
+    // =========================================================================
+
+    /**
+     * Returns true if the URL points to a Twitter GIF (tweet_video path).
+     * GIFs on X are looping, silent MP4 files stored at:
+     *   https://video.twimg.com/tweet_video/FILENAME.mp4
+     */
+    function isGifUrl(url) {
+        return url.includes('video.twimg.com/tweet_video/');
+    }
+
+    /**
+     * Builds a clean filename from a media URL.
+     * Strips any existing extension from the basename, then appends the
+     * desired extension - preventing double-extension bugs like "foo.mp4.mp4".
+     */
+    function buildFilename(url, idx, ext) {
+        try {
+            const parts   = new URL(url).pathname.split('/');
+            const base    = (parts[parts.length - 1] || `media_${idx}`).split('?')[0];
+            // Strip existing extension (e.g. ".mp4", ".jpg") from the base
+            const noExt   = base.replace(/\.[^.]+$/, '');
+            return `${noExt}.${ext}`;
+        } catch (_) {
+            return `twitter_media_${idx}.${ext}`;
+        }
+    }
+
+    function getBestImageUrl(src) {
+        try {
+            const u = new URL(src);
+            if (u.hostname === 'pbs.twimg.com') {
+                u.searchParams.set('format', 'jpg');
+                u.searchParams.set('name', 'orig');
+                return u.toString();
+            }
+        } catch (_) {}
+        return src;
+    }
+
+    // =========================================================================
+    // SYNDICATION API - via background service worker (CORS-free)
+    // =========================================================================
+
+    function fetchTweetDataViaBackground(statusId) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+                { type: 'FETCH_TWEET_DATA', statusId },
+                (response) => {
+                    if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+                    if (!response)                { reject(new Error('No response from background')); return; }
+                    if (!response.ok)             { reject(new Error(response.error || 'Background fetch failed')); return; }
+                    resolve(response.data);
+                }
+            );
+        });
+    }
+
+    async function getVideoUrlFromSyndication(statusId) {
+        const data = await fetchTweetDataViaBackground(statusId);
+        console.log('X Ad Blocker: Syndication data keys:', Object.keys(data));
+
+        let variants = null;
+
+        if (data?.video?.variants?.length) {
+            variants = data.video.variants;
+            console.log('X Ad Blocker: Using data.video.variants');
+        } else if (data?.mediaDetails?.length) {
+            for (const media of data.mediaDetails) {
+                if (media?.video_info?.variants?.length) {
+                    variants = media.video_info.variants.map(v => ({
+                        type: v.content_type,
+                        src: v.url,
+                        bitrate: v.bitrate
+                    }));
+                    console.log('X Ad Blocker: Using data.mediaDetails[].video_info.variants');
+                    break;
+                }
+            }
+        }
+
+        if (!variants?.length) {
+            console.log('X Ad Blocker: No video variants. Response:', JSON.stringify(data).slice(0, 500));
+            return null;
+        }
+
+        // Keep only MP4s (skip HLS m3u8)
+        const mp4s = variants.filter(v =>
+            (v.type === 'video/mp4' || v.content_type === 'video/mp4') &&
+            v.src?.includes('video.twimg.com')
+        );
+
+        if (!mp4s.length) {
+            console.log('X Ad Blocker: No MP4 variants. All:', JSON.stringify(variants));
+            return null;
+        }
+
+        // Sort by bitrate descending (GIFs have no bitrate - only one variant anyway)
+        mp4s.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+        const best = mp4s[0];
+        console.log(`X Ad Blocker: ${mp4s.length} MP4(s). Best (${best.bitrate || 'GIF'}bps):`, best.src);
+        return best.src;
+    }
+
+    // =========================================================================
+    // FILE DOWNLOAD
+    // =========================================================================
+
+    async function downloadFile(url, filename) {
+        try {
+            const res = await fetch(url, { mode: 'cors' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const sizeKB = (blob.size / 1024).toFixed(1);
+            console.log(`X Ad Blocker: Blob ${sizeKB} KB | ${blob.type}`);
+
+            if (blob.size < 10_000) {
+                const preview = await blob.text();
+                console.warn('X Ad Blocker: Suspiciously small:', preview.slice(0, 200));
+                throw new Error(`Too small (${sizeKB} KB)`);
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+            const a = Object.assign(document.createElement('a'), {
+                href: blobUrl, download: filename, style: 'display:none'
+            });
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 8000);
+            return true;
+        } catch (err) {
+            console.warn('X Ad Blocker: Download failed, opening new tab:', err);
+            window.open(url, '_blank');
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // DOWNLOAD HANDLER
+    // =========================================================================
+
+    async function downloadTweetMedia(tweet, button) {
+        console.log('X Ad Blocker: 📥 Download initiated.');
+        button.setAttribute('data-loading', 'true');
+
+        const mediaItems = [];
+
+        // Images
+        const photos = tweet.querySelectorAll('[data-testid="tweetPhoto"]');
+        photos.forEach((c, i) => {
+            const img = c.querySelector('img');
+            if (img?.src && !img.src.startsWith('data:')) {
+                const url = getBestImageUrl(img.src);
+                mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+            }
+        });
+        if (!photos.length) {
+            tweet.querySelectorAll('[data-testid$=".media"] img').forEach((img, i) => {
+                if (img?.src?.includes('pbs.twimg.com')) {
+                    const url = getBestImageUrl(img.src);
+                    mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                }
+            });
+        }
+
+        // Video / GIF
+        if (tweet.querySelector('video')) {
+            const statusId = getTweetStatusId(tweet);
+            console.log('X Ad Blocker: Status ID:', statusId);
+
+            if (!statusId) {
+                showToast('Could not find tweet ID.', 'warning', '#e0245e');
+                button.removeAttribute('data-loading');
+                return;
+            }
+
+            try {
+                const videoUrl = await getVideoUrlFromSyndication(statusId);
+                if (videoUrl) {
+                    // X GIFs are MP4 files internally - always save as .mp4
+                    const type = isGifUrl(videoUrl) ? 'gif' : 'video';
+                    mediaItems.push({ type, url: videoUrl, filename: buildFilename(videoUrl, 0, 'mp4') });
+                } else {
+                    showToast('Video not found (may be private or deleted).', 'warning', '#657786');
+                    button.removeAttribute('data-loading');
+                    return;
+                }
+            } catch (err) {
+                console.error('X Ad Blocker: Syndication error:', err);
+                showToast(`Failed to get video: ${err.message}`, 'warning', '#e0245e');
+                button.removeAttribute('data-loading');
+                return;
+            }
+        }
+
+        if (!mediaItems.length) {
+            showToast('No downloadable media found in this post.', 'warning', '#657786');
+        } else {
+            let ok = 0;
+            for (const item of mediaItems) {
+                console.log(`X Ad Blocker: ⬇️ ${item.type}: ${item.filename}`);
+                await sleep(150);
+                if (await downloadFile(item.url, item.filename)) ok++;
+            }
+            const msg = mediaItems.length === 1
+                ? 'Media downloaded ✓'
+                : `${ok}/${mediaItems.length} media downloaded ✓`;
+            showToast(msg, 'download', '#1da1f2');
+        }
+
+        button.removeAttribute('data-loading');
+    }
+
+    // =========================================================================
+    // DOWNLOAD BUTTON - mirrors Action_bar.html structure exactly
+    // =========================================================================
+
+    function createDownloadButton(svgClass, wrapperClass) {
+        // svgClass is copied from sibling buttons so we blend in on all page types:
+        // Home/Comment: "r-1xvli5t r-1hdv0qi"  (small icons)
+        // Post/QuoteReply: "r-50lct3 r-1srniue"  (large icons)
+        const sc = svgClass || 'r-4qtqp9 r-yyyyoo r-dnmrzs r-bnwqim r-lrvibr r-m6rgpd r-1xvli5t r-1hdv0qi';
+        const wrapper = document.createElement('div');
+        wrapper.className = wrapperClass || 'css-175oi2r r-18u37iz r-1h0z5md r-1wron08';
+        wrapper.innerHTML = `
+            <button aria-label="Download media" role="button"
+                data-testid="download-media" type="button"
+                class="css-175oi2r r-1777fci r-bt1l66 r-bztko3 r-lrvibr r-1loqt21 r-1ny4l3l">
+                <div dir="ltr"
+                    class="css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-a023e6 r-rjixqe r-16dba41 r-1awozwy r-6koalj r-1h0z5md r-o7ynqc r-clp7b1 r-3s2u2q"
+                    style="color:rgb(113,118,123)">
+                    <div class="css-175oi2r r-xoduu5">
+                        <div class="css-175oi2r r-xoduu5 r-1p0dtai r-1d2f490 r-u8s1d r-zchlnj r-ipm5af r-1niwhzg r-sdzlij r-xf4iuw r-o7ynqc r-6416eg r-1ny4l3l"></div>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="${sc}">
+                            <g><path d="M12 16.59l-5.7-5.7 1.41-1.42L11 12.76V3h2v9.76l3.3-3.3 1.41 1.42L12 16.59zM3 21v-3.5h2V19h14v-1.5h2V21H3z"/></g>
+                        </svg>
+                    </div>
+                </div>
+            </button>
+        `;
+        return wrapper;
+    }
+
+    function addDownloadButtonToTweet(tweet) {
+        if (tweet.dataset.downloadButtonAdded) return;
+        const actionBar = tweet.querySelector('[role="group"]');
+        if (!actionBar) return;
+        // Detect SVG class from an existing sibling button to match page style.
+        // Post page uses larger icons (r-50lct3 r-1srniue), home/comment uses smaller (r-1xvli5t r-1hdv0qi).
+        const sibSvg = actionBar.querySelector('button svg, a svg');
+        const sibClass = sibSvg ? sibSvg.getAttribute('class') : null;
+        // Match wrapper class of the bookmark button so spacing is identical
+        // Home/Comment: bookmark uses r-1wron08 (no count label)
+        // Post/QuoteReply: bookmark uses r-13awgt0 (has count label spacing)
+        const bookmarkEl = actionBar.querySelector('[data-testid="bookmark"]');
+        const bookmarkWrapperClass = bookmarkEl?.parentElement?.className || 'css-175oi2r r-18u37iz r-1h0z5md r-1wron08';
+        const wrapper = createDownloadButton(sibClass, bookmarkWrapperClass);
+        const btn = wrapper.querySelector('[data-testid="download-media"]');
+        btn.addEventListener('click', e => {
+            e.preventDefault(); e.stopPropagation();
+            downloadTweetMedia(tweet, btn);
+        });
+        // Insert before bookmark to match X native order:
+        // reply | retweet | like | analytics | [download] | bookmark | share
+        const bookmarkWrapper = actionBar.querySelector('[data-testid="bookmark"]')?.parentElement;
+        if (bookmarkWrapper && bookmarkWrapper.parentElement === actionBar) {
+            actionBar.insertBefore(wrapper, bookmarkWrapper);
+        } else {
+            const shareWrapper = actionBar.querySelector('[style*="inline-grid"]');
+            shareWrapper ? actionBar.insertBefore(wrapper, shareWrapper) : actionBar.appendChild(wrapper);
+        }
+        tweet.dataset.downloadButtonAdded = 'true';
+    }
+
+    // =========================================================================
+    // AD BLOCKING
+    // =========================================================================
+
+    const AD_LABELS = ['Reklam', 'Ad', 'Promoted'];
+    let isBlocking = false;
+
+    function blockUserInteractions() {
+        let s = document.getElementById('x-adb-shield');
+        if (!s) {
+            s = document.createElement('div');
+            s.id = 'x-adb-shield';
+            Object.assign(s.style, {
+                position:'fixed', top:'0', left:'0', width:'100vw', height:'100vh',
+                zIndex:'2147483647', background:'transparent', cursor:'default'
+            });
+            document.body.appendChild(s);
+        }
+        s.style.display = 'block';
+        document.body.classList.add('x-ad-blocking-active');
     }
 
     function allowUserInteractions() {
-        const shield = document.getElementById("x-ad-blocker-shield");
-        if (shield) {
-            shield.style.display = "none";
-        }
-        document.body.classList.remove("x-ad-blocking-active");
-    }
-
-    function showToastNotification(advertiserName) {
-        // Clear any existing toast notification
-        const existingToast = document.getElementById("x-ad-blocker-toast");
-        if (existingToast) existingToast.remove();
-
-        const toast = document.createElement("div");
-        toast.id = "x-ad-blocker-toast";
-        toast.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                </svg>
-                <span>Blocked <b>${advertiserName}</b></span>
-            </div>
-        `;
-
-        // Modern, clean, and unobtrusive aesthetic design
-        Object.assign(toast.style, {
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            backgroundColor: "#1da1f2", // Twitter Blue
-            color: "#ffffff",
-            padding: "12px 16px",
-            borderRadius: "50px",
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-            fontSize: "14px",
-            fontWeight: "500",
-            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.15)",
-            zIndex: "999999",
-            opacity: "0",
-            transform: "translateY(20px)",
-            transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-            pointerEvents: "none"
-        });
-
-        document.body.appendChild(toast);
-
-        // Animate in
-        requestAnimationFrame(() => {
-            toast.style.opacity = "1";
-            toast.style.transform = "translateY(0)";
-        });
-
-        // Disappear after 3 seconds
-        setTimeout(() => {
-            toast.style.opacity = "0";
-            toast.style.transform = "translateY(20px)";
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        const s = document.getElementById('x-adb-shield');
+        if (s) s.style.display = 'none';
+        document.body.classList.remove('x-ad-blocking-active');
     }
 
     async function blockAdAccount(tweetElement) {
         if (isBlocking) return;
         isBlocking = true;
-
-        // Prevent user from clicking elsewhere and accidentally closing Twitter menus
         blockUserInteractions();
+        console.log('X Ad Blocker: ─── Blocking ad... ───');
 
-        console.log("X Ad Blocker: ------------------------------------------------");
-        console.log("X Ad Blocker: 🔍 Ad detected, initiating blocking process...");
+        let name = '@Sponsored';
+        const un = tweetElement.querySelector('[data-testid="User-Name"]');
+        if (un) { const sp = un.querySelectorAll('span'); if (sp.length) name = sp[0].textContent; }
 
-        // Try to get the advertiser's name from the UI
-        let advertiserName = "@Sponsored";
-        const userNameElem = tweetElement.querySelector('[data-testid="User-Name"]');
-        if (userNameElem) {
-            const spans = userNameElem.querySelectorAll('span');
-            if (spans.length > 0) advertiserName = spans[0].textContent;
-        }
-
-        // Softly fade out the ad so as not to distract the user
-        tweetElement.style.transition = 'opacity 0.2s ease-out';
+        tweetElement.style.transition = 'opacity .2s ease-out';
         tweetElement.style.opacity = '0';
         tweetElement.style.pointerEvents = 'none';
 
         try {
-            // 1. Find and click the "More" (3 dots) button inside the tweet
             let moreBtn = null;
-            let retryCount = 0;
-            const maxRetries = 10; // Will search for up to 2 seconds (10 x 200ms)
-
-            while (!moreBtn && retryCount < maxRetries) {
-                // X sometimes uses 'caret' data-testid, and sometimes aria-label.
+            for (let i = 0; i < 10 && !moreBtn; i++) {
                 moreBtn = tweetElement.querySelector('[data-testid="caret"]')
                     || tweetElement.querySelector('[aria-label="Daha fazla"]')
                     || tweetElement.querySelector('[aria-label="More"]');
-
-                if (!moreBtn) {
-                    retryCount++;
-                    console.log(`X Ad Blocker: ⚠️ Button not fully loaded into DOM yet. Waiting... (Attempt ${retryCount}/${maxRetries})`);
-                    await sleep(200); // Wait 200 milliseconds
-                }
+                if (!moreBtn) await sleep(200);
             }
-
             if (moreBtn) {
-                console.log("X Ad Blocker: ✅ Step 1 - Found 3 dots (More) button and clicking it.");
                 moreBtn.click();
-
-                // 2. Find and click the "Block" button from the opened menu
-                let blockMenuItem = null;
-                let blockRetryCount = 0;
-                const maxBlockRetries = 10;
-
-                // The data-testid="block" element only becomes visible in the DOM when the menu is opened
-                while (!blockMenuItem && blockRetryCount < maxBlockRetries) {
-                    blockRetryCount++;
-                    console.log(`X Ad Blocker: Waiting for menu to open (Attempt ${blockRetryCount}/${maxBlockRetries})...`);
-                    await sleep(200);
-                    blockMenuItem = document.querySelector('[data-testid="block"]');
-                }
-
-                if (blockMenuItem) {
-                    console.log("X Ad Blocker: ✅ Step 2 - Found Block menu item and clicking it.");
-                    blockMenuItem.click();
-
-                    // 3. Click the "Block" button on the "Are you sure?" confirmation modal
+                let blockItem = null;
+                for (let i = 0; i < 10 && !blockItem; i++) { await sleep(200); blockItem = document.querySelector('[data-testid="block"]'); }
+                if (blockItem) {
+                    blockItem.click();
                     let confirmBtn = null;
-                    let confirmRetryCount = 0;
-                    const maxConfirmRetries = 10;
-
-                    // Wait for the confirmation modal to open
-                    while (!confirmBtn && confirmRetryCount < maxConfirmRetries) {
-                        confirmRetryCount++;
-                        console.log(`X Ad Blocker: Waiting for confirmation modal to open (Attempt ${confirmRetryCount}/${maxConfirmRetries})...`);
-                        await sleep(200);
-                        confirmBtn = document.querySelector('[data-testid="confirmationSheetConfirm"]');
-                    }
-
+                    for (let i = 0; i < 10 && !confirmBtn; i++) { await sleep(200); confirmBtn = document.querySelector('[data-testid="confirmationSheetConfirm"]'); }
                     if (confirmBtn) {
-                        console.log("X Ad Blocker: ✅ Step 3 - Found confirmation modal, clicking '#Block' button.");
                         confirmBtn.click();
-                        console.log("X Ad Blocker: 🎉 SUCCESS: Advertiser blocked!");
-
-                        // Show aesthetic notification to the user
-                        showToastNotification(advertiserName);
-
+                        showToast(`Blocked: <b>${name}</b>`, 'block', '#1da1f2');
                     } else {
-                        console.log("X Ad Blocker: ❌ ERROR (Step 3) - Confirm button (confirmationSheetConfirm) not found in DOM.");
-                        // Log the modal HTML for debugging purposes
-                        const modal = document.querySelector('[data-testid="confirmationSheetDialog"]');
-                        if (modal) console.log("X Ad Blocker: Current Modal HTML state:", modal.outerHTML);
-                        else console.log("X Ad Blocker: Modal (confirmationSheetDialog) might not have opened at all.");
-
-                        const cancelBtn = document.querySelector('[data-testid="confirmationSheetCancel"]');
-                        if (cancelBtn) cancelBtn.click();
+                        const cancel = document.querySelector('[data-testid="confirmationSheetCancel"]');
+                        if (cancel) cancel.click();
                     }
-                } else {
-                    console.log("X Ad Blocker: ❌ ERROR (Step 2) - Block menu item (data-testid='block') not found in DOM.");
-                    // Log the document
-                    const dropdown = document.querySelector('[data-testid="Dropdown"]');
-                    if (dropdown) console.log("X Ad Blocker: Current opened Dropdown Menu HTML state:", dropdown.outerHTML);
-
-                    document.body.click(); // Close the menu
-                }
-            } else {
-                console.log("X Ad Blocker: ⚠️ INFO (Step 1) - 3 dots menu button was not found in the ad despite waiting 2 seconds.");
-                console.log("X Ad Blocker: This is likely a special X ad format with no block button. We couldn't block the advertiser, but we are completely hiding this post from your screen! 🗑️👀");
+                } else { document.body.click(); }
             }
-        } catch (err) {
-            console.error("X Ad Blocker: 🚨 UNEXPECTED ERROR:", err);
-        } finally {
-            // Remove the user interaction shield once the job is done or an error occurs!
+        } catch (err) { console.error('X Ad Blocker: Error:', err); }
+        finally {
             allowUserInteractions();
-
-            // completely hide the tweet from the DOM just in case
             tweetElement.style.display = 'none';
-            releaseBodyScroll(); // X sometimes leaves body overflow:hidden due to modals, clear this.
-
+            releaseBodyScroll();
             await sleep(200);
             isBlocking = false;
-            console.log("X Ad Blocker: Blocking process finished, lock released. Scanning for upcoming ads...");
-            console.log("X Ad Blocker: ------------------------------------------------");
-
-            // Re-trigger scanning in case we missed other tweets
             processTweets();
         }
     }
+
+    // =========================================================================
+    // MAIN PROCESSOR & INIT
+    // =========================================================================
 
     function processTweets() {
         if (isBlocking) return;
-
-        const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-        for (const tweet of Array.from(tweets)) {
+        for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
+            addDownloadButtonToTweet(tweet);
             if (tweet.dataset.adProcessed) continue;
-
             let isAd = false;
-            let detectedLabel = "";
-
-            const spans = tweet.querySelectorAll('span');
-            for (const span of Array.from(spans)) {
-                const text = span.textContent.trim();
-                // If the text in the span is an ad label
-                if (AD_LABELS.includes(text)) {
-                    // However, if the user's own tweet body contains words like "Promoted" or "Ad", do not block it.
-                    const tweetTextContainer = tweet.querySelector('[data-testid="tweetText"]');
-                    if (tweetTextContainer && tweetTextContainer.contains(span)) {
-                        continue; // This area is the actual tweet content, not the metadata label.
-                    }
-                    isAd = true;
-                    detectedLabel = text;
-                    break;
+            for (const span of tweet.querySelectorAll('span')) {
+                const t = span.textContent.trim();
+                if (AD_LABELS.includes(t)) {
+                    if (tweet.querySelector('[data-testid="tweetText"]')?.contains(span)) continue;
+                    isAd = true; break;
                 }
             }
-
-            if (isAd) {
-                console.log(`X Ad Blocker: New ad detected on screen (Label: ${detectedLabel}).`);
-                tweet.dataset.adProcessed = "true";
-                blockAdAccount(tweet);
-                return; // Break the loop to block only one account at a time
-            } else {
-                tweet.dataset.adProcessed = "true";
-            }
+            tweet.dataset.adProcessed = 'true';
+            if (isAd) { blockAdAccount(tweet); return; }
         }
     }
 
-    // Scan once when the page initially loads (Timeout provided for React/NextJS hydration)
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            console.log("X Ad Blocker: 🚀 Page loaded, starting to listen to X (Twitter)...");
+    function init() {
+        console.log('X Ad Blocker: 🚀 Running.');
+        const observer = new MutationObserver(muts => {
+            if (muts.some(m => m.addedNodes.length)) processTweets();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        processTweets();
+    }
 
-            // Catch new tweets as they are added to the page (upon scrolling) using MutationObserver
-            const observer = new MutationObserver((mutations) => {
-                let shouldProcess = false;
-                for (const mutation of mutations) {
-                    if (mutation.addedNodes.length > 0) {
-                        shouldProcess = true;
-                        break;
-                    }
-                }
-                if (shouldProcess) {
-                    processTweets();
-                }
-            });
-
-            // The Twitter (X) app typically renders dynamic DOM elements under <main> or the body
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-
-            // Start the initial scan
-            processTweets();
-        }, 1500); // Start 1.5 seconds after page load
-    });
+    setTimeout(init, 1500);
 
 })();
