@@ -6,9 +6,9 @@
     // r-11z020y / mask -> Background overlay layer when the modal is open
     const style = document.createElement('style');
     style.innerHTML = `
-        div[data-testid="Dropdown"], 
-        div[data-testid="confirmationSheetDialog"], 
-        div[data-testid="mask"] {
+        body.x-ad-blocking-active div[data-testid="Dropdown"], 
+        body.x-ad-blocking-active div[data-testid="confirmationSheetDialog"], 
+        body.x-ad-blocking-active div[data-testid="mask"] {
             opacity: 0 !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -59,6 +59,7 @@
             document.body.appendChild(shield);
         }
         shield.style.display = "block";
+        document.body.classList.add("x-ad-blocking-active");
     }
 
     function allowUserInteractions() {
@@ -66,6 +67,7 @@
         if (shield) {
             shield.style.display = "none";
         }
+        document.body.classList.remove("x-ad-blocking-active");
     }
 
     function showToastNotification(advertiserName) {

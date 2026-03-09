@@ -10,7 +10,7 @@ Unlike traditional ad blockers that rely on network filters or just hide element
 
 - **Real-Time Detection**: Utilizes `MutationObserver` to constantly scan for new tweets as you scroll down your timeline.
 - **Smart Retries & Hydration Handling**: Waits intelligently for X's React hydration cycles (up to 2 seconds) instead of blindly failing if a dropdown menu or confirmation modal is slow to load.
-- **Invisible Blocking Engine**: Injects a custom CSS stylesheet that visually hides the "More Options" dropdown menu and the "Are you sure?" confirmation modals. They trigger, they get clicked, but you never see them.
+- **Invisible Blocking Engine**: Injects a custom CSS stylesheet that visually hides the "More Options" dropdown menu and the "Are you sure?" confirmation modals **only during the active blocking process**. This ensures you can still manually interact with tweets without interference while the automation works in the background.
 - **Interaction Shield**: Creates a temporary, invisible full-screen layer (`z-index: 2147483647`) during the 1-second blocking process to prevent stray clicks from accidentally closing the background menus.
 - **Clean UI Feedback**: Submits a subtle, Twitter-style "Toast" notification in the bottom right corner (e.g., "Blocked @AdvertiserName") that fades out smoothly after 3 seconds.
 - **Flawless Scrolling**: Properly restores `document.body.style.overflow` native CSS, ensuring no double-scrollbars or screen freezing ever occurs.
