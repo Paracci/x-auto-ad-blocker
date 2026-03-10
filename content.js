@@ -165,10 +165,11 @@
 
         let variants = null;
 
-        if (data?.video?.variants?.length) {
-            variants = data.video.variants;
-            console.log('X Ad Blocker: Using data.video.variants');
-        } else if (data?.mediaDetails?.length) {
+        // PRIORITY: mediaDetails[].video_info.variants includes bitrate per variant.
+        // data.video.variants does NOT include bitrate, so sorting by quality is impossible.
+        // Always prefer mediaDetails when available; fall back to video.variants for GIFs
+        // (tweet_video path) which only ever have one variant and no bitrate anyway.
+        if (data?.mediaDetails?.length) {
             for (const media of data.mediaDetails) {
                 if (media?.video_info?.variants?.length) {
                     variants = media.video_info.variants.map(v => ({
@@ -176,10 +177,16 @@
                         src: v.url,
                         bitrate: v.bitrate
                     }));
-                    console.log('X Ad Blocker: Using data.mediaDetails[].video_info.variants');
+                    console.log('X Ad Blocker: Using mediaDetails variants (with bitrate)');
                     break;
                 }
             }
+        }
+
+        // Fallback: data.video.variants (no bitrate info - GIFs / edge cases)
+        if (!variants?.length && data?.video?.variants?.length) {
+            variants = data.video.variants;
+            console.log('X Ad Blocker: Fallback to data.video.variants (no bitrate info)');
         }
 
         if (!variants?.length) {
