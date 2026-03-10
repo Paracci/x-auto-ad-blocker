@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X Ad Blocker</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="app-container">
+
+        <!-- Sol: İçerik -->
+        <main class="content-area">
+
+            <!-- Home Page -->
+            <div id="page-home" class="page active">
+                <header>
+                    <!-- X (Twitter) logosu -->
+                    <svg class="brand-icon" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
+                    </svg>
+                    <h1>X Ad Blocker</h1>
+                </header>
+
+                <!-- Status + toggle -->
+                <div class="card">
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label">Protection</div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                                <div class="status-dot" id="status-dot"></div>
+                                <span class="status-text" id="status-text">Active</span>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="main-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Stats: Blocked + Downloaded -->
+                <div class="card">
+                    <div style="display:flex;align-items:center;">
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-blocked">0</div>
+                            <div class="stat-label">Blocked</div>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-downloads">0</div>
+                            <div class="stat-label">Downloaded</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Downloader info -->
+                <div class="card">
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label">Media Downloader</div>
+                            <div class="row-sublabel">Videos, GIFs & images</div>
+                        </div>
+                        <span class="badge">Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="page-settings" class="page">
+                <header>
+                    <h1>Settings</h1>
+                </header>
+
+                <div class="card">
+                    <h2>Ad Blocking</h2>
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label">Auto-block advertisers</div>
+                            <div class="row-sublabel">Permanently blocks the account</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-ad-block" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label">Show toast notifications</div>
+                            <div class="row-sublabel">Confirm when an ad is blocked</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-toasts" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Media Downloader</h2>
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label">Show download button</div>
+                            <div class="row-sublabel">Inject button into every tweet</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-downloader" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <button class="action-btn danger" id="btn-reset" style="width:100%;justify-content:center;">
+                        Reset Statistics
+                    </button>
+                </div>
+            </div>
+
+            <!-- About Page -->
+            <div id="page-about" class="page">
+                <header>
+                    <h1>About</h1>
+                </header>
+                <div class="card">
+                    <div class="row-label" id="about-version">Version ...</div>
+                    <p style="margin-top:8px;">Automatically blocks advertisers on X and lets you download videos, GIFs and images — all client-side, no data collected.</p>
+                </div>
+                <div class="card">
+                    <h2>How it works</h2>
+                    <p style="margin-bottom:8px;">• Detects ad labels (<b style="color:var(--x-text-primary)">Ad, Promoted, Reklam</b>) via MutationObserver</p>
+                    <p style="margin-bottom:8px;">• Silently clicks Block → Confirm in the background</p>
+                    <p>• Uses X's Syndication API to fetch the highest-bitrate MP4</p>
+                </div>
+                <div class="card">
+                    <h2>Privacy</h2>
+                    <p>No data is collected or transmitted. The only external request is to <b style="color:var(--x-text-primary)">cdn.syndication.twimg.com</b> — X's own public API — and only when you click the download button.</p>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Sağ: Sidebar -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <button class="nav-item active" data-target="page-home">
+                    <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                    <span>Home</span>
+                </button>
+                <button class="nav-item" data-target="page-settings">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                    <span>Settings</span>
+                </button>
+                <button class="nav-item" data-target="page-about">
+                    <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                    <span>About</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="credit-text">Crafted by</span>
+                <span class="credit-brand">Paracci</span>
+            </div>
+        </aside>
+
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

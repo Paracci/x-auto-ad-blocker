@@ -27,6 +27,69 @@
     injectStyles();
 
     // =========================================================================
+    // SETTINGS STATE  (synced from chrome.storage + popup messages)
+    // =========================================================================
+
+    const settings = {
+        extensionEnabled:  true,
+        adBlockEnabled:    true,
+        toastsEnabled:     true,
+        downloaderEnabled: true,
+    };
+
+    // Load persisted settings once on startup
+    chrome.storage.local.get(
+        ['extensionEnabled', 'adBlockEnabled', 'toastsEnabled', 'downloaderEnabled'],
+        (res) => {
+            if (res.extensionEnabled  !== undefined) settings.extensionEnabled  = res.extensionEnabled;
+            if (res.adBlockEnabled    !== undefined) settings.adBlockEnabled    = res.adBlockEnabled;
+            if (res.toastsEnabled     !== undefined) settings.toastsEnabled     = res.toastsEnabled;
+            if (res.downloaderEnabled !== undefined) settings.downloaderEnabled = res.downloaderEnabled;
+        }
+    );
+
+    // Listen for real-time toggle messages from the popup
+    chrome.runtime.onMessage.addListener((message) => {
+        switch (message.action) {
+            case 'toggle_extension':
+                settings.extensionEnabled = message.enabled;
+                if (!message.enabled) {
+                    // Hide all injected download buttons immediately
+                    document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
+                        w.style.display = 'none';
+                    });
+                } else {
+                    // Restore download buttons if downloader is also enabled
+                    if (settings.downloaderEnabled) {
+                        document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
+                            w.style.display = '';
+                        });
+                    }
+                    processTweets();
+                }
+                break;
+
+            case 'toggle_ad_block':
+                settings.adBlockEnabled = message.enabled;
+                break;
+
+            case 'toggle_downloader':
+                settings.downloaderEnabled = message.enabled;
+                if (!message.enabled) {
+                    document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
+                        w.style.display = 'none';
+                    });
+                } else {
+                    document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
+                        w.style.display = '';
+                    });
+                    processTweets();
+                }
+                break;
+        }
+    });
+
+    // =========================================================================
     // HELPERS
     // =========================================================================
 
@@ -44,30 +107,31 @@
     // =========================================================================
 
     function showToast(htmlMsg, iconType = 'block', bgColor = '#1da1f2') {
+        if (!settings.toastsEnabled) return;   // ← popup "Show toast notifications" toggle
         const old = document.getElementById('x-adb-toast');
         if (old) old.remove();
         const icons = {
-            block:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+            block: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
             download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16.59l-5.7-5.7 1.41-1.42L11 12.76V3h2v9.76l3.3-3.3 1.41 1.42L12 16.59zM3 21v-3.5h2V19h14v-1.5h2V21H3z"/></svg>`,
-            warning:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+            warning: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
         };
         const toast = document.createElement('div');
         toast.id = 'x-adb-toast';
-        toast.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">${icons[iconType]||''}<span>${htmlMsg}</span></div>`;
+        toast.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">${icons[iconType] || ''}<span>${htmlMsg}</span></div>`;
         Object.assign(toast.style, {
-            position:'fixed', bottom:'24px', right:'24px',
-            backgroundColor:bgColor, color:'#fff',
-            padding:'12px 16px', borderRadius:'50px',
-            fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
-            fontSize:'14px', fontWeight:'500',
-            boxShadow:'0 4px 14px rgba(0,0,0,.15)',
-            zIndex:'999999', opacity:'0', transform:'translateY(20px)',
-            transition:'all .3s cubic-bezier(.25,.8,.25,1)', pointerEvents:'none'
+            position: 'fixed', bottom: '24px', right: '24px',
+            backgroundColor: bgColor, color: '#fff',
+            padding: '12px 16px', borderRadius: '50px',
+            fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+            fontSize: '14px', fontWeight: '500',
+            boxShadow: '0 4px 14px rgba(0,0,0,.15)',
+            zIndex: '999999', opacity: '0', transform: 'translateY(20px)',
+            transition: 'all .3s cubic-bezier(.25,.8,.25,1)', pointerEvents: 'none'
         });
         document.body.appendChild(toast);
-        requestAnimationFrame(() => { toast.style.opacity='1'; toast.style.transform='translateY(0)'; });
+        requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
         setTimeout(() => {
-            toast.style.opacity='0'; toast.style.transform='translateY(20px)';
+            toast.style.opacity = '0'; toast.style.transform = 'translateY(20px)';
             setTimeout(() => toast.remove(), 300);
         }, 3500);
     }
@@ -119,10 +183,10 @@
      */
     function buildFilename(url, idx, ext) {
         try {
-            const parts   = new URL(url).pathname.split('/');
-            const base    = (parts[parts.length - 1] || `media_${idx}`).split('?')[0];
+            const parts = new URL(url).pathname.split('/');
+            const base = (parts[parts.length - 1] || `media_${idx}`).split('?')[0];
             // Strip existing extension (e.g. ".mp4", ".jpg") from the base
-            const noExt   = base.replace(/\.[^.]+$/, '');
+            const noExt = base.replace(/\.[^.]+$/, '');
             return `${noExt}.${ext}`;
         } catch (_) {
             return `twitter_media_${idx}.${ext}`;
@@ -137,7 +201,7 @@
                 u.searchParams.set('name', 'orig');
                 return u.toString();
             }
-        } catch (_) {}
+        } catch (_) { }
         return src;
     }
 
@@ -147,15 +211,27 @@
 
     function fetchTweetDataViaBackground(statusId) {
         return new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-                { type: 'FETCH_TWEET_DATA', statusId },
-                (response) => {
-                    if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
-                    if (!response)                { reject(new Error('No response from background')); return; }
-                    if (!response.ok)             { reject(new Error(response.error || 'Background fetch failed')); return; }
-                    resolve(response.data);
-                }
-            );
+            // Guard: chrome.runtime can become undefined if the extension context
+            // is invalidated (e.g. extension reloaded/updated while page was open).
+            if (!chrome?.runtime?.sendMessage) {
+                reject(new Error('Extension context invalidated — please refresh the page.'));
+                return;
+            }
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'FETCH_TWEET_DATA', statusId },
+                    (response) => {
+                        // Re-check after async callback — context may have gone away
+                        if (chrome?.runtime?.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+                        if (!response) { reject(new Error('No response from background')); return; }
+                        if (!response.ok) { reject(new Error(response.error || 'Background fetch failed')); return; }
+                        resolve(response.data);
+                    }
+                );
+            } catch (err) {
+                // Catch synchronous throws (e.g. "Extension context invalidated")
+                reject(new Error(`sendMessage failed: ${err.message}`));
+            }
         });
     }
 
@@ -317,6 +393,10 @@
                 ? 'Media downloaded ✓'
                 : `${ok}/${mediaItems.length} media downloaded ✓`;
             showToast(msg, 'download', '#1da1f2');
+            // Increment persistent counter → updates popup stat in real-time
+            chrome.storage.local.get('downloadCount', (r) => {
+                chrome.storage.local.set({ downloadCount: (r.downloadCount || 0) + ok });
+            });
         }
 
         button.removeAttribute('data-loading');
@@ -354,6 +434,8 @@
 
     function addDownloadButtonToTweet(tweet) {
         if (tweet.dataset.downloadButtonAdded) return;
+        // If downloader or extension is disabled, mark as processed but don't inject
+        if (!settings.extensionEnabled || !settings.downloaderEnabled) return;
         const actionBar = tweet.querySelector('[role="group"]');
         if (!actionBar) return;
         // Detect SVG class from an existing sibling button to match page style.
@@ -366,6 +448,7 @@
         const bookmarkEl = actionBar.querySelector('[data-testid="bookmark"]');
         const bookmarkWrapperClass = bookmarkEl?.parentElement?.className || 'css-175oi2r r-18u37iz r-1h0z5md r-1wron08';
         const wrapper = createDownloadButton(sibClass, bookmarkWrapperClass);
+        wrapper.setAttribute('data-x-dl-wrapper', '');  // marker for toggle visibility
         const btn = wrapper.querySelector('[data-testid="download-media"]');
         btn.addEventListener('click', e => {
             e.preventDefault(); e.stopPropagation();
@@ -396,8 +479,8 @@
             s = document.createElement('div');
             s.id = 'x-adb-shield';
             Object.assign(s.style, {
-                position:'fixed', top:'0', left:'0', width:'100vw', height:'100vh',
-                zIndex:'2147483647', background:'transparent', cursor:'default'
+                position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+                zIndex: '2147483647', background: 'transparent', cursor: 'default'
             });
             document.body.appendChild(s);
         }
@@ -444,6 +527,10 @@
                     if (confirmBtn) {
                         confirmBtn.click();
                         showToast(`Blocked: <b>${name}</b>`, 'block', '#1da1f2');
+                        // Increment persistent counter → updates popup stat in real-time
+                        chrome.storage.local.get('blockedCount', (r) => {
+                            chrome.storage.local.set({ blockedCount: (r.blockedCount || 0) + 1 });
+                        });
                     } else {
                         const cancel = document.querySelector('[data-testid="confirmationSheetCancel"]');
                         if (cancel) cancel.click();
@@ -470,6 +557,11 @@
         for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
             addDownloadButtonToTweet(tweet);
             if (tweet.dataset.adProcessed) continue;
+            // Only scan for ads if both master switch and ad-block switch are on
+            if (!settings.extensionEnabled || !settings.adBlockEnabled) {
+                tweet.dataset.adProcessed = 'true';
+                continue;
+            }
             let isAd = false;
             for (const span of tweet.querySelectorAll('span')) {
                 const t = span.textContent.trim();
