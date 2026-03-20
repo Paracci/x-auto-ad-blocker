@@ -2,10 +2,20 @@
 // Content scripts can't fetch cross-origin URLs even with host_permissions
 // due to CORS. Background service workers are exempt from CORS restrictions.
 
+// The token value X's embed widget uses. If X starts validating tokens more
+// strictly this will be the first thing to change — update it here.
+const SYNDICATION_TOKEN = 'x';
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'FETCH_TWEET_DATA') {
         const { statusId } = message;
-        const url = `https://cdn.syndication.twimg.com/tweet-result?id=${statusId}&lang=en&token=x`;
+
+        if (!statusId || !/^\d+$/.test(statusId)) {
+            sendResponse({ ok: false, error: 'Invalid status ID' });
+            return false;
+        }
+
+        const url = `https://cdn.syndication.twimg.com/tweet-result?id=${statusId}&lang=en&token=${SYNDICATION_TOKEN}`;
 
         fetch(url, {
             headers: {
@@ -13,6 +23,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
         })
             .then(res => {
+                if (res.status === 404) throw new Error('Tweet not found (deleted or private)');
+                if (res.status === 429) throw new Error('Rate limited by X — please wait a moment');
+                if (res.status === 403) throw new Error('Access denied — the syndication token may have changed');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })
