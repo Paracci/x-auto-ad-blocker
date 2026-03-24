@@ -94,6 +94,7 @@ const TRANSLATIONS = {
         toastNoMedia: 'No downloadable media found in this post.',
         toastMediaDownloaded: 'Media downloaded ✓',
         toastMediaDownloadedMulti: 'media downloaded ✓',
+        toastConverting: 'Converting GIF...',
 
         downloaderAriaLabel: 'Download media',
     },
@@ -170,6 +171,7 @@ const TRANSLATIONS = {
         toastNoMedia: 'Bu gönderide indirilebilir medya bulunamadı.',
         toastMediaDownloaded: 'Medya indirildi ✓',
         toastMediaDownloadedMulti: 'medya indirildi ✓',
+        toastConverting: 'GIF Dönüştürülüyor...',
 
         downloaderAriaLabel: 'Medyayı indir',
     },

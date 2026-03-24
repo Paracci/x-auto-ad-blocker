@@ -212,16 +212,20 @@
     // =========================================================================
 
     function getTweetStatusId(tweetElement) {
-        const timeLink = tweetElement.querySelector('time')?.closest('a[href*="/status/"]');
-        if (timeLink) {
-            const m = timeLink.getAttribute('href').match(/\/status\/(\d+)/);
-            if (m) return m[1];
+        if (tweetElement) {
+            const timeLink = tweetElement.querySelector('time')?.closest('a[href*="/status/"]');
+            if (timeLink) {
+                const m = timeLink.getAttribute('href').match(/\/status\/(\d+)/);
+                if (m) return m[1];
+            }
+            for (const a of tweetElement.querySelectorAll('a[href*="/status/"]')) {
+                const m = a.getAttribute('href').match(/\/status\/(\d+)/);
+                if (m) return m[1];
+            }
         }
-        for (const a of tweetElement.querySelectorAll('a[href*="/status/"]')) {
-            const m = a.getAttribute('href').match(/\/status\/(\d+)/);
-            if (m) return m[1];
-        }
-        return null;
+        // Fallback: Check current URL for status ID (e.g. in photo modal)
+        const urlMatch = window.location.href.match(/\/status\/(\d+)/);
+        return urlMatch ? urlMatch[1] : null;
     }
 
     // =========================================================================
@@ -232,8 +236,8 @@
     //
     // GIF detection:
     //   X stores GIFs as looping silent MP4s under /tweet_video/.
-    //   We save them as .gif so file managers and chat apps treat them correctly.
-    //   The H.264 container opens fine under a .gif extension in all major viewers.
+    //   We save them as .mp4 because strictly forcing a .gif extension causes 
+    //   "corrupted file" errors in players that validate H.264/GIF89a headers.
     // =========================================================================
 
     /**
@@ -388,56 +392,64 @@
 
     async function downloadTweetMedia(tweet, button) {
         button.setAttribute('data-loading', 'true');
-
+        const statusId = getTweetStatusId(tweet);
         const mediaItems = [];
 
-        // Images
-        const photos = tweet.querySelectorAll('[data-testid="tweetPhoto"]');
-        photos.forEach((c, i) => {
-            const img = c.querySelector('img');
-            if (img?.src && !img.src.startsWith('data:')) {
-                const url = getBestImageUrl(img.src);
-                mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+        if (statusId) {
+            try {
+                const data = await fetchTweetDataViaBackground(statusId);
+                
+                // 1. Process Media from API (Most Accurate)
+                if (data?.mediaDetails?.length) {
+                    data.mediaDetails.forEach((m, i) => {
+                        if (m.type === 'video' || m.type === 'animated_gif') {
+                            const variants = m.video_info?.variants || [];
+                            const mp4s = variants.filter(v => (v.content_type === 'video/mp4' || v.type === 'video/mp4') && v.url?.includes('video.twimg.com'));
+                            mp4s.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+                            if (mp4s.length) {
+                                const url = mp4s[0].url || mp4s[0].src;
+                                const isGif = m.type === 'animated_gif' || isGifUrl(url);
+                                mediaItems.push({
+                                    type: isGif ? 'gif' : 'video',
+                                    url,
+                                    filename: buildFilename(url, i, isGif ? 'gif' : 'mp4')
+                                });
+                            }
+                        } else if (m.type === 'photo') {
+                            const url = getBestImageUrl(m.media_url_https || m.media_url);
+                            mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('X Ad Blocker: Syndication API failed, falling back to DOM scraping:', err);
             }
-        });
-        if (!photos.length) {
-            tweet.querySelectorAll('[data-testid$=".media"] img').forEach((img, i) => {
-                if (img?.src?.includes('pbs.twimg.com')) {
+        }
+
+        // 2. Fallback to DOM Scraping (if API failed or returned nothing)
+        if (mediaItems.length === 0) {
+            // Images
+            const photos = tweet.querySelectorAll('[data-testid="tweetPhoto"]');
+            photos.forEach((c, i) => {
+                const img = c.querySelector('img');
+                if (img?.src && !img.src.startsWith('data:')) {
                     const url = getBestImageUrl(img.src);
                     mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
                 }
             });
-        }
-
-        // Video / GIF
-        if (tweet.querySelector('video')) {
-            const statusId = getTweetStatusId(tweet);
-
-            if (!statusId) {
-                showToast(i18n.t('toastNoTweetId'), 'warning', '#e0245e');
-                button.removeAttribute('data-loading');
-                return;
+            if (!photos.length) {
+                tweet.querySelectorAll('[data-testid$=".media"] img').forEach((img, i) => {
+                    if (img?.src?.includes('pbs.twimg.com')) {
+                        const url = getBestImageUrl(img.src);
+                        mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                    }
+                });
             }
-
-            try {
-                const videoUrl = await getVideoUrlFromSyndication(statusId);
-                if (videoUrl) {
-                    const gif = isGifUrl(videoUrl);
-                    mediaItems.push({
-                        type: gif ? 'gif' : 'video',
-                        url: videoUrl,
-                        filename: buildFilename(videoUrl, 0, gif ? 'gif' : 'mp4')
-                    });
-                } else {
-                    showToast(i18n.t('toastVideoNotFound'), 'warning', '#657786');
-                    button.removeAttribute('data-loading');
-                    return;
-                }
-            } catch (err) {
-                console.error('X Ad Blocker: Syndication error:', err);
-                showToast(`${i18n.t('toastVideoFailed')} ${err.message}`, 'warning', '#e0245e');
-                button.removeAttribute('data-loading');
-                return;
+            // Simple Video Fallback (best effort)
+            const video = tweet.querySelector('video');
+            if (video?.src && video.src.startsWith('http')) {
+                const gif = isGifUrl(video.src);
+                mediaItems.push({ type: gif ? 'gif' : 'video', url: video.src, filename: buildFilename(video.src, 0, gif ? 'gif' : 'mp4') });
             }
         }
 
@@ -447,7 +459,37 @@
             let ok = 0;
             for (const item of mediaItems) {
                 await sleep(150);
-                if (await downloadFile(item.url, item.filename)) ok++;
+                if (item.type === 'gif') {
+                    showToast(i18n.t('toastConverting'), 'download', '#1da1f2');
+                    try {
+                        const response = await new Promise((resolve) => {
+                            chrome.runtime.sendMessage({
+                                type: 'CONVERT_TO_GIF',
+                                url: item.url,
+                                filename: item.filename
+                            }, resolve);
+                        });
+                        if (response?.ok && response.gifData) {
+                            // gifData is a data URL
+                            const a = Object.assign(document.createElement('a'), {
+                                href: response.gifData, download: item.filename, style: 'display:none'
+                            });
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            ok++;
+                        } else {
+                            throw new Error(response?.error || 'Conversion failed');
+                        }
+                    } catch (err) {
+                        console.error('X Ad Blocker: GIF conversion failed, falling back to MP4:', err);
+                        // Fallback to MP4 if conversion fails
+                        const mp4Filename = item.filename.replace(/\.gif$/, '.mp4');
+                        if (await downloadFile(item.url, mp4Filename)) ok++;
+                    }
+                } else {
+                    if (await downloadFile(item.url, item.filename)) ok++;
+                }
             }
             const msg = mediaItems.length === 1
                 ? i18n.t('toastMediaDownloaded')
@@ -466,7 +508,7 @@
     // DOWNLOAD BUTTON - mirrors Action_bar.html structure exactly
     // =========================================================================
 
-    function createDownloadButton(svgClass, wrapperClass, hasCountSpacer) {
+    function createDownloadButton(svgClass, wrapperClass, hasCountSpacer, iconColor) {
         // svgClass is copied from sibling buttons so we blend in on all page types:
         // Home/Comment: "r-1xvli5t r-1hdv0qi"  (small icons)
         // Post/QuoteReply/Photo view: "r-50lct3 r-1srniue"  (large icons)
@@ -476,6 +518,9 @@
         // the icon that adds vertical spacing. Without it our button sits higher than
         // the rest, breaking alignment. We inject an empty spacer to match exactly.
         const sc = svgClass || 'r-4qtqp9 r-yyyyoo r-dnmrzs r-bnwqim r-lrvibr r-m6rgpd r-1xvli5t r-1hdv0qi';
+        // Use sibling icon color if provided, fallback to standard Twitter/X gray
+        const color = iconColor || 'rgb(113, 118, 123)';
+        
         // The spacer div needs real (but invisible) text content so its height
         // matches sibling buttons that show counts like "8", "102" etc.
         // An empty div collapses to 0px and the icon ends up misaligned.
@@ -496,7 +541,7 @@
                 class="css-175oi2r r-1777fci r-bt1l66 r-bztko3 r-lrvibr r-1loqt21 r-1ny4l3l">
                 <div dir="ltr"
                     class="css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-a023e6 r-rjixqe r-16dba41 r-1awozwy r-6koalj r-1h0z5md r-o7ynqc r-clp7b1 r-3s2u2q"
-                    style="color:rgb(113,118,123)">
+                    style="color:${color}">
                     <div class="css-175oi2r r-xoduu5">
                         <div class="css-175oi2r r-xoduu5 r-1p0dtai r-1d2f490 r-u8s1d r-zchlnj r-ipm5af r-1niwhzg r-sdzlij r-xf4iuw r-o7ynqc r-6416eg r-1ny4l3l"></div>
                         <svg viewBox="0 0 24 24" aria-hidden="true" class="${sc}">
@@ -514,29 +559,40 @@
         if (tweet.dataset.downloadButtonAdded) return;
         // If downloader or extension is disabled, mark as processed but don't inject
         if (!settings.extensionEnabled || !settings.downloaderEnabled) return;
+        
         const actionBar = tweet.querySelector('[role="group"]');
         if (!actionBar) return;
-        // Detect SVG class from an existing sibling button to match page style.
-        // Post page uses larger icons (r-50lct3 r-1srniue), home/comment uses smaller (r-1xvli5t r-1hdv0qi).
+
+        // Prevent double injection if multiple triggers find the same action bar
+        if (actionBar.querySelector('[data-testid="download-media"]')) {
+            tweet.dataset.downloadButtonAdded = 'true';
+            return;
+        }
+
+        // Detect SVG class and COLOR from an existing sibling button to match page style.
+        // Post page uses larger icons, homeUses smaller. Photo view uses white instead of gray.
         const sibSvg = actionBar.querySelector('button svg, a svg');
         const sibClass = sibSvg ? sibSvg.getAttribute('class') : null;
+        const sibBtnDiv = sibSvg?.closest('div[dir="ltr"]');
+        const iconColor = sibBtnDiv ? window.getComputedStyle(sibBtnDiv).color : null;
+        
         // Match wrapper class of the bookmark button so spacing is identical
-        // Home/Comment: bookmark uses r-1wron08 (no count label)
-        // Post/QuoteReply: bookmark uses r-13awgt0 (has count label spacing)
         const bookmarkEl = actionBar.querySelector('[data-testid="bookmark"]');
         const bookmarkWrapperClass = bookmarkEl?.parentElement?.className || 'css-175oi2r r-18u37iz r-1h0z5md r-1wron08';
+        
         // r-13awgt0 = post/photo view: every sibling button has a count-label spacer div.
-        // We must add the same empty spacer to keep vertical alignment consistent.
-        const hasCountSpacer = bookmarkWrapperClass.includes('r-13awgt0');
-        const wrapper = createDownloadButton(sibClass, bookmarkWrapperClass, hasCountSpacer);
+        const hasCountSpacer = bookmarkWrapperClass.includes('r-13awgt0') || actionBar.className.includes('r-1kbdv8c');
+        
+        const wrapper = createDownloadButton(sibClass, bookmarkWrapperClass, hasCountSpacer, iconColor);
         wrapper.setAttribute('data-x-dl-wrapper', '');  // marker for toggle visibility
         const btn = wrapper.querySelector('[data-testid="download-media"]');
+        
         btn.addEventListener('click', e => {
             e.preventDefault(); e.stopPropagation();
             downloadTweetMedia(tweet, btn);
         });
-        // Insert before bookmark to match X native order:
-        // reply | retweet | like | analytics | [download] | bookmark | share
+
+        // Insert before bookmark or at the end
         const bookmarkWrapper = actionBar.querySelector('[data-testid="bookmark"]')?.parentElement;
         if (bookmarkWrapper && bookmarkWrapper.parentElement === actionBar) {
             actionBar.insertBefore(wrapper, bookmarkWrapper);
@@ -649,6 +705,8 @@
 
     function processTweets() {
         if (isBlocking) return;
+        
+        // 1. Process regular tweets in the feed
         for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
             addDownloadButtonToTweet(tweet);
             if (tweet.dataset.adProcessed) continue;
@@ -667,6 +725,20 @@
             }
             tweet.dataset.adProcessed = 'true';
             if (isAd) { blockAdAccount(tweet); return; }
+        }
+
+        // 2. Process expanded photo modal (standalone action bar)
+        // We look for any role="group" with specific analytics label.
+        const photoModalActionBar = document.querySelector('.r-1kbdv8c[role="group"]');
+        if (photoModalActionBar) {
+            // Find the most relevant context. 
+            // Prefer the nearest article, but fallback to a reasonable local container if missing.
+            const modalContext = photoModalActionBar.closest('article[data-testid="tweet"]') 
+                              || photoModalActionBar.closest('[data-testid="sheetDialog"]')
+                              || photoModalActionBar.parentElement;
+            if (modalContext) {
+                addDownloadButtonToTweet(modalContext);
+            }
         }
     }
 

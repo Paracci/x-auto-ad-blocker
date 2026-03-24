@@ -34,4 +34,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         return true; // keep message channel open for async sendResponse
     }
+
+    if (message.type === 'CONVERT_TO_GIF') {
+        handleGifConversion(message.url, message.filename, sendResponse);
+        return true;
+    }
 });
+
+async function handleGifConversion(url, filename, sendResponse) {
+    try {
+        await setupOffscreenDocument('src/offscreen/offscreen.html');
+        const response = await chrome.runtime.sendMessage({
+            type: 'CONVERT_MP4_TO_GIF',
+            url,
+            filename
+        });
+        sendResponse(response);
+    } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+    }
+}
+
+async function setupOffscreenDocument(path) {
+    // Check if offscreen document already exists
+    const existingContexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+        documentUrls: [chrome.runtime.getURL(path)]
+    });
+
+    if (existingContexts.length > 0) return;
+
+    // create offscreen document
+    await chrome.offscreen.createDocument({
+        url: path,
+        reasons: ['BLOBS'],
+        justification: 'Transcoding MP4 transition videos into GIF format for user downloads.'
+    });
+}
