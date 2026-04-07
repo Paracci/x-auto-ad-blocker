@@ -2,6 +2,9 @@
 
 A lightweight, purely client-side Chrome extension that automatically detects and permanently blocks sponsored ad accounts on X (formerly Twitter) in real-time — with a built-in media downloader for videos, GIFs, and images, and a fully integrated control popup.
 
+### 🌐 [Live Demo & Showcase](https://paracci.github.io/x-auto-ad-blocker/)
+Explore the interactive landing page to see the premium UI and features in action: **[paracci.github.io/x-auto-ad-blocker](https://paracci.github.io/x-auto-ad-blocker/)**
+
 Unlike traditional ad blockers that rely on network filters or CSS hiding, this extension **mimics real user interaction by systematically BLOCKING the advertiser's account entirely** in the background. Because the account itself is blocked, you'll never see another ad from that specific advertiser again — not just on your current device, but across all platforms where you use your X account.
 
 > Part of the **Paracci Browser Tools** collection — privacy-first, zero telemetry, built for power users.
