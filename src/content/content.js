@@ -270,7 +270,11 @@
         try {
             const u = new URL(src);
             if (u.hostname === 'pbs.twimg.com') {
-                u.searchParams.set('format', 'jpg');
+                if (!u.searchParams.has('format')) {
+                    const ext = u.pathname.split('.').pop().toLowerCase();
+                    const fmt = ['png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+                    u.searchParams.set('format', fmt);
+                }
                 u.searchParams.set('name', 'orig');
                 return u.toString();
             }
@@ -416,8 +420,15 @@
                                 });
                             }
                         } else if (m.type === 'photo') {
-                            const url = getBestImageUrl(m.media_url_https || m.media_url);
-                            mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                            const rawUrl = m.media_url_https || m.media_url;
+                            const url = getBestImageUrl(rawUrl);
+                            const imgExt = (() => {
+                                try {
+                                    const p = new URL(url).searchParams.get('format');
+                                    return p || new URL(rawUrl).pathname.split('.').pop().toLowerCase() || 'jpg';
+                                } catch (_) { return 'jpg'; }
+                            })();
+                            mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, imgExt) });
                         }
                     });
                 }
@@ -434,14 +445,20 @@
                 const img = c.querySelector('img');
                 if (img?.src && !img.src.startsWith('data:')) {
                     const url = getBestImageUrl(img.src);
-                    mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                    const fallbackExt = (() => {
+                        try { return new URL(url).searchParams.get('format') || 'jpg'; } catch (_) { return 'jpg'; }
+                    })();
+                    mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, fallbackExt) });
                 }
             });
             if (!photos.length) {
                 tweet.querySelectorAll('[data-testid$=".media"] img').forEach((img, i) => {
                     if (img?.src?.includes('pbs.twimg.com')) {
                         const url = getBestImageUrl(img.src);
-                        mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, 'jpg') });
+                        const fallbackExt = (() => {
+                            try { return new URL(url).searchParams.get('format') || 'jpg'; } catch (_) { return 'jpg'; }
+                        })();
+                        mediaItems.push({ type: 'image', url, filename: buildFilename(url, i, fallbackExt) });
                     }
                 });
             }
