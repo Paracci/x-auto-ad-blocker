@@ -5,6 +5,17 @@
     // STYLES
     // =========================================================================
 
+    function updateAdBlockState() {
+        const target = document.body || document.documentElement;
+        if (target) {
+            if (settings.extensionEnabled && settings.adBlockEnabled) {
+                target.classList.add('x-ad-blocking-enabled');
+            } else {
+                target.classList.remove('x-ad-blocking-enabled');
+            }
+        }
+    }
+
     function injectStyles() {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -13,6 +24,13 @@
             body.x-ad-blocking-active div[data-testid="mask"],
             body.x-ad-blocking-active div[role="menu"],
             body.x-ad-blocking-active #layers > div > div[style*="position: absolute"] {
+                display:none!important;
+                pointer-events:none!important;
+                transition:none!important;
+            }
+            .x-ad-blocking-enabled div[data-testid="whoToFollowSspAd"],
+            .x-ad-blocking-enabled div[data-testid*="SspAd"],
+            .x-ad-blocking-enabled div[id^="div-gpt-ad-"] {
                 display:none!important;
                 pointer-events:none!important;
                 transition:none!important;
@@ -52,6 +70,7 @@
             if (res.adBlockEnabled !== undefined) settings.adBlockEnabled = res.adBlockEnabled;
             if (res.toastsEnabled !== undefined) settings.toastsEnabled = res.toastsEnabled;
             if (res.downloaderEnabled !== undefined) settings.downloaderEnabled = res.downloaderEnabled;
+            updateAdBlockState();
         }
     );
 
@@ -76,6 +95,7 @@
                         }
                         processTweets();
                     }
+                    updateAdBlockState();
                     break;
 
                 case 'toggle_ad_block':
@@ -86,6 +106,7 @@
                         });
                         processTweets();
                     }
+                    updateAdBlockState();
                     break;
 
                 case 'toggle_downloader':
