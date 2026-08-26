@@ -42,15 +42,30 @@
                 </div>
 
                 <!-- Stats -->
-                <div class="card">
-                    <div style="display:flex;align-items:center;">
+                <div class="card stats-card">
+                    <div class="stats-grid">
                         <div class="stat-block">
-                            <div class="stat-val" id="stat-blocked">0</div>
-                            <div class="stat-label" data-i18n="statBlocked">Blocked</div>
+                            <div class="stat-val" id="stat-blocked" aria-live="polite">0</div>
+                            <div class="stat-label" data-i18n="statBlocked">Blocked accounts</div>
                         </div>
-                        <div class="stat-divider"></div>
                         <div class="stat-block">
-                            <div class="stat-val" id="stat-downloads">0</div>
+                            <div class="stat-val" id="stat-ad-blocked" aria-live="polite">0</div>
+                            <div class="stat-label" data-i18n="statAdBlocked">Ad accounts</div>
+                        </div>
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-promoted-blocked" aria-live="polite">0</div>
+                            <div class="stat-label" data-i18n="statPromotedBlocked">Promoted accounts</div>
+                        </div>
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-filtered" aria-live="polite">0</div>
+                            <div class="stat-label" data-i18n="statFiltered">Filtered posts</div>
+                        </div>
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-hidden" aria-live="polite">0</div>
+                            <div class="stat-label" data-i18n="statHidden">Hidden posts</div>
+                        </div>
+                        <div class="stat-block">
+                            <div class="stat-val" id="stat-downloads" aria-live="polite">0</div>
                             <div class="stat-label" data-i18n="statDownloaded">Downloaded</div>
                         </div>
                     </div>
@@ -89,6 +104,26 @@
                     </div>
                     <div class="card-row">
                         <div>
+                            <div class="row-label" data-i18n="settingPromotedBlock">Auto-block promoted posts</div>
+                            <div class="row-sublabel" data-i18n="settingPromotedBlockSub">Permanently blocks the post's account on X</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-promoted-block">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label" data-i18n="settingBlockMode">When a match is found</div>
+                            <div class="row-sublabel" data-i18n="settingBlockModeSub">Hide the post or permanently block its account</div>
+                        </div>
+                        <select id="block-mode" class="inline-select" data-i18n-title="settingBlockMode" aria-label="When a match is found">
+                            <option value="account" data-i18n="blockModeAccount">Block account on X</option>
+                            <option value="hide" data-i18n="blockModeHide">Hide post only</option>
+                        </select>
+                    </div>
+                    <div class="card-row">
+                        <div>
                             <div class="row-label" data-i18n="settingToasts">Show toast notifications</div>
                             <div class="row-sublabel" data-i18n="settingToastsSub">Confirm when an ad is blocked</div>
                         </div>
@@ -96,6 +131,20 @@
                             <input type="checkbox" id="toggle-toasts" checked>
                             <span class="slider"></span>
                         </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 data-i18n="sectionFilters">Personal Filters</h2>
+                    <div class="row-label" data-i18n="filterRulesLabel">Hide posts containing...</div>
+                    <div class="row-sublabel" data-i18n="filterRulesSub">One word, phrase, hashtag or @handle per line</div>
+                    <textarea id="filter-rules" class="filter-rules" rows="4"
+                        data-i18n-placeholder="filterRulesPlaceholder"
+                        data-i18n-title="sectionFilters"
+                        aria-label="Personal filters"></textarea>
+                    <div class="filter-actions">
+                        <span id="filter-status" class="inline-status" role="status" aria-live="polite"></span>
+                        <button class="action-btn" id="save-filters" data-i18n="saveFilters">Save filters</button>
                     </div>
                 </div>
 
@@ -109,6 +158,16 @@
                         </div>
                         <label class="toggle-switch">
                             <input type="checkbox" id="toggle-downloader" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="card-row">
+                        <div>
+                            <div class="row-label" data-i18n="settingMediaOnly">Show only on posts with media</div>
+                            <div class="row-sublabel" data-i18n="settingMediaOnlySub">Keep the action bar clean on text-only posts</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-media-only" checked>
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -150,6 +209,17 @@
                 </div>
 
                 <div class="card">
+                    <h2 data-i18n="sectionData">Backup &amp; data</h2>
+                    <p class="data-hint" data-i18n="dataBackupHint">Includes settings, filters, counters and blocked history.</p>
+                    <div class="data-actions">
+                        <button class="action-btn ghost" id="btn-export" data-i18n="exportData">Export data</button>
+                        <button class="action-btn ghost" id="btn-import" data-i18n="importData">Import data</button>
+                        <input type="file" id="import-file" accept="application/json,.json" hidden>
+                    </div>
+                    <div id="data-status" class="inline-status" role="status" aria-live="polite"></div>
+                </div>
+
+                <div class="card">
                     <button class="action-btn danger" id="btn-reset" style="width:100%;justify-content:center;"
                         data-i18n="btnReset">
                         Reset Statistics
@@ -171,10 +241,10 @@
                     <h2 data-i18n="howItWorks">How it works</h2>
                     <p style="margin-bottom:8px;">• <span data-i18n="howItWorksItem1">Detects ad labels (Ad, Promoted,
                             Reklam) via MutationObserver</span></p>
-                    <p style="margin-bottom:8px;">• <span data-i18n="howItWorksItem2">Silently clicks Block → Confirm in
-                            the background</span></p>
-                    <p>• <span data-i18n="howItWorksItem3">Uses X's Syndication API to fetch the highest-bitrate
-                            MP4</span></p>
+                            <p style="margin-bottom:8px;">• <span data-i18n="howItWorksItem2">Hides matched posts or silently blocks the account on X, depending on your setting</span></p>
+                            <p>• <span data-i18n="howItWorksItem3">Uses X's Syndication API to fetch the highest-bitrate
+                                MP4</span></p>
+                            <p>• <span data-i18n="howItWorksItem4">Applies your personal filters locally</span></p>
                 </div>
                 <div class="card">
                     <h2 data-i18n="privacyTitle">Privacy</h2>
@@ -198,6 +268,7 @@
                             style="color:var(--x-blue);text-decoration:underline;" data-i18n="blockedNoteLink">X →
                             Settings → Blocked accounts</a>.
                     </p>
+                    <p class="blocked-unblock-hint" data-i18n="unblockHint">To undo a permanent block, open the account on X and choose Unblock.</p>
                 </div>
                 <div class="card">
                     <p id="blocked-empty" style="color:var(--x-text-secondary);font-size:13px;margin:0;"

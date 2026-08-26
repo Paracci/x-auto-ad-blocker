@@ -8,7 +8,7 @@
     function updateAdBlockState() {
         const target = document.body || document.documentElement;
         if (target) {
-            if (settings.extensionEnabled && settings.adBlockEnabled) {
+            if (settings.extensionEnabled && (settings.adBlockEnabled || settings.promotedBlockEnabled)) {
                 target.classList.add('x-ad-blocking-enabled');
             } else {
                 target.classList.remove('x-ad-blocking-enabled');
@@ -35,13 +35,28 @@
                 pointer-events:none!important;
                 transition:none!important;
             }
-            [data-testid="download-media"]:hover > div { color:rgb(29,155,240)!important; }
-            [data-testid="download-media"]:hover .r-1p0dtai { background-color:rgba(29,155,240,0.1)!important; }
-            [data-testid="download-media"]:hover svg path { fill:rgb(29,155,240)!important; }
-            [data-testid="download-media"] { background:none; border:none; padding:0; cursor:pointer; }
-            [data-testid="download-media"][data-loading="true"] {
-                opacity:0.35!important; pointer-events:none!important;
-            }
+[data-testid="download-media"]:hover > div { color:rgb(29,155,240)!important; }
+[data-testid="download-media"]:hover .r-1p0dtai { background-color:rgba(29,155,240,0.1)!important; }
+[data-testid="download-media"]:hover svg path { fill:rgb(29,155,240)!important; }
+[data-testid="download-media"] {
+    display:flex;
+    position:relative;
+    flex:0 0 auto;
+    align-items:stretch;
+    justify-content:center;
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+}
+/* Keep X's hover ripple anchored to the icon, not the optional count spacer. */
+[data-testid="download-media"] > div > div:first-child {
+    position:relative;
+    flex:0 0 auto;
+}
+[data-testid="download-media"][data-loading="true"] {
+    opacity:0.35!important; pointer-events:none!important;
+}
         `;
         (document.head || document.documentElement).appendChild(style);
     }
@@ -54,25 +69,48 @@
     const settings = {
         extensionEnabled: true,
         adBlockEnabled: true,
+        promotedBlockEnabled: false,
+        blockMode: 'account',
         toastsEnabled: true,
         downloaderEnabled: true,
+        mediaOnlyDownloader: true,
+        filterRules: [],
     };
+    let settingsReadyResolve;
+    const settingsReady = new Promise(resolve => { settingsReadyResolve = resolve; });
 
     // Initialise i18n engine (translations.js is loaded before this file)
     i18n.init();
 
-    // Load persisted settings once on startup
-    safeStorageGet(
-        ['extensionEnabled', 'adBlockEnabled', 'toastsEnabled', 'downloaderEnabled'],
-        (res) => {
-            if (!res) return;
-            if (res.extensionEnabled !== undefined) settings.extensionEnabled = res.extensionEnabled;
-            if (res.adBlockEnabled !== undefined) settings.adBlockEnabled = res.adBlockEnabled;
-            if (res.toastsEnabled !== undefined) settings.toastsEnabled = res.toastsEnabled;
-            if (res.downloaderEnabled !== undefined) settings.downloaderEnabled = res.downloaderEnabled;
-            updateAdBlockState();
-        }
-    );
+    // Load persisted settings once on startup. If the extension was reloaded
+    // while this page was open, continue with safe defaults instead of leaving
+    // the observer waiting forever on an invalidated context.
+    if (!isContextValid()) {
+        settingsReadyResolve();
+    } else {
+        safeStorageGet(
+            [
+                'extensionEnabled', 'adBlockEnabled', 'promotedBlockEnabled', 'blockMode',
+                'toastsEnabled', 'downloaderEnabled', 'mediaOnlyDownloader', 'filterRules'
+            ],
+            (res) => {
+                if (!res) {
+                    settingsReadyResolve();
+                    return;
+                }
+                if (res.extensionEnabled !== undefined) settings.extensionEnabled = res.extensionEnabled;
+                if (res.adBlockEnabled !== undefined) settings.adBlockEnabled = res.adBlockEnabled;
+                if (res.promotedBlockEnabled !== undefined) settings.promotedBlockEnabled = res.promotedBlockEnabled;
+                if (res.blockMode === 'hide' || res.blockMode === 'account') settings.blockMode = res.blockMode;
+                if (res.toastsEnabled !== undefined) settings.toastsEnabled = res.toastsEnabled;
+                if (res.downloaderEnabled !== undefined) settings.downloaderEnabled = res.downloaderEnabled;
+                if (res.mediaOnlyDownloader !== undefined) settings.mediaOnlyDownloader = res.mediaOnlyDownloader !== false;
+                if (Array.isArray(res.filterRules)) settings.filterRules = normalizeFilterRules(res.filterRules);
+                updateAdBlockState();
+                settingsReadyResolve();
+            }
+        );
+    }
 
     // Listen for real-time toggle messages from the popup
     try {
@@ -83,16 +121,12 @@
                     settings.extensionEnabled = message.enabled;
                     if (!message.enabled) {
                         // Hide all injected download buttons immediately
-                        document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
-                            w.style.display = 'none';
-                        });
+                        restoreAutoHiddenTweets();
+                        refreshDownloadButtonVisibility();
                     } else {
                         // Restore download buttons if downloader is also enabled
-                        if (settings.downloaderEnabled) {
-                            document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
-                                w.style.display = '';
-                            });
-                        }
+                        refreshDownloadButtonVisibility();
+                        resetTweetProcessingState();
                         processTweets();
                     }
                     updateAdBlockState();
@@ -101,26 +135,51 @@
                 case 'toggle_ad_block':
                     settings.adBlockEnabled = message.enabled;
                     if (message.enabled) {
-                        document.querySelectorAll('article[data-testid="tweet"]').forEach(t => {
-                            delete t.dataset.adProcessed;
-                        });
+                        resetTweetProcessingState('ad');
                         processTweets();
+                    } else {
+                        restoreAutoHiddenTweets(['ad']);
                     }
                     updateAdBlockState();
                     break;
 
+                case 'toggle_promoted_block':
+                    settings.promotedBlockEnabled = message.enabled;
+                    if (message.enabled) {
+                        resetTweetProcessingState('promoted');
+                        processTweets();
+                    } else {
+                        restoreAutoHiddenTweets(['promoted']);
+                    }
+                    updateAdBlockState();
+                    break;
+
+                case 'set_block_mode':
+                    if (message.mode !== 'hide' && message.mode !== 'account') break;
+                    settings.blockMode = message.mode;
+                    restoreAutoHiddenTweets(['ad', 'promoted']);
+                    resetTweetProcessingState('ad');
+                    resetTweetProcessingState('promoted');
+                    processTweets();
+                    break;
+
                 case 'toggle_downloader':
                     settings.downloaderEnabled = message.enabled;
-                    if (!message.enabled) {
-                        document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
-                            w.style.display = 'none';
-                        });
-                    } else {
-                        document.querySelectorAll('[data-x-dl-wrapper]').forEach(w => {
-                            w.style.display = '';
-                        });
-                        processTweets();
-                    }
+                    refreshDownloadButtonVisibility();
+                    if (message.enabled) processTweets();
+                    break;
+
+                case 'toggle_media_only':
+                    settings.mediaOnlyDownloader = message.enabled !== false;
+                    refreshDownloadButtonVisibility();
+                    processTweets();
+                    break;
+
+                case 'update_filter_rules':
+                    settings.filterRules = normalizeFilterRules(message.rules);
+                    restoreAutoHiddenTweets(['filter']);
+                    resetTweetProcessingState('filter');
+                    processTweets();
                     break;
             }
         });
@@ -149,10 +208,17 @@
         }
     }
 
-    /** Safe wrapper for chrome.storage.local.get — silently no-ops if context is gone. */
+    /** Safe wrapper for chrome.storage.local.get — returns safe defaults if context is gone. */
     function safeStorageGet(keys, cb) {
-        if (!isContextValid()) return;
-        try { chrome.storage.local.get(keys, cb); } catch (e) { /* context gone */ }
+        if (!isContextValid()) {
+            if (typeof cb === 'function') cb({});
+            return;
+        }
+        try {
+            chrome.storage.local.get(keys, cb);
+        } catch (e) {
+            if (typeof cb === 'function') cb({});
+        }
     }
 
     /** Safe wrapper for chrome.storage.local.set — silently no-ops if context is gone. */
@@ -166,6 +232,98 @@
         document.body.style.overscrollBehaviorY = '';
         document.body.style.paddingRight = '';
         document.body.style.marginRight = '';
+    }
+
+    function normalizeFilterRules(rules) {
+        const values = Array.isArray(rules) ? rules : String(rules || '').split(/\r?\n/);
+        return [...new Set(values
+            .map(rule => String(rule || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .map(rule => rule.slice(0, 200)))]
+            .slice(0, 100);
+    }
+
+    function restoreAutoHiddenTweets(reasons = null) {
+        const allowed = reasons ? new Set(reasons) : null;
+        document.querySelectorAll('[data-x-hidden-by-extension="true"]').forEach(tweet => {
+            const reason = tweet.dataset.xHiddenReason;
+            if (allowed && !allowed.has(reason)) return;
+            tweet.style.display = '';
+            tweet.style.opacity = '';
+            tweet.style.pointerEvents = '';
+            tweet.style.transition = '';
+            delete tweet.dataset.xHiddenByExtension;
+            delete tweet.dataset.xHiddenReason;
+            delete tweet.dataset.xHiddenCounted;
+        });
+    }
+
+    function recordHidden(reason) {
+        const key = reason === 'filter' ? 'filteredCount' : 'hiddenCount';
+        safeStorageGet(key, result => {
+            const current = Number.isFinite(result?.[key]) ? result[key] : 0;
+            safeStorageSet({ [key]: current + 1 });
+        });
+    }
+
+    function recordMatch(reason) {
+        const key = reason === 'promoted' ? 'promotedMatchCount' : 'adMatchCount';
+        safeStorageGet(key, result => {
+            const current = Number.isFinite(result?.[key]) ? result[key] : 0;
+            safeStorageSet({ [key]: current + 1 });
+        });
+    }
+
+    function hideTweet(tweetElement, reason) {
+        if (!tweetElement) return;
+        if (tweetElement.dataset.xHiddenByExtension === 'true'
+            && tweetElement.dataset.xHiddenReason === reason) return;
+
+        tweetElement.dataset.xHiddenByExtension = 'true';
+        tweetElement.dataset.xHiddenReason = reason;
+        tweetElement.style.transition = 'opacity .15s ease-out';
+        tweetElement.style.opacity = '0';
+        tweetElement.style.pointerEvents = 'none';
+        if (!tweetElement.dataset.xHiddenCounted) {
+            tweetElement.dataset.xHiddenCounted = 'true';
+            recordHidden(reason);
+        }
+        setTimeout(() => {
+            if (tweetElement.dataset.xHiddenByExtension === 'true') {
+                tweetElement.style.display = 'none';
+                tweetElement.style.opacity = '';
+                tweetElement.style.pointerEvents = '';
+            }
+        }, 160);
+    }
+
+    function hasDownloadableMedia(context) {
+        if (!context?.querySelector) return false;
+        return Boolean(context.querySelector(
+            '[data-testid="tweetPhoto"], [data-testid="videoPlayer"], '
+            + '[data-testid="videoComponent"], video, [data-testid$=".media"], '
+            + 'a[href*="/photo/"]'
+        ));
+    }
+
+    function downloadContextFor(wrapper) {
+        return wrapper.closest('article[data-testid="tweet"]')
+            || wrapper.closest('[data-testid="sheetDialog"]')
+            || wrapper.closest('[role="dialog"]')
+            || wrapper.parentElement;
+    }
+
+    function updateDownloadButtonVisibility(wrapper) {
+        if (!wrapper) return;
+        const context = downloadContextFor(wrapper);
+        const visible = settings.extensionEnabled
+            && settings.downloaderEnabled
+            && (!settings.mediaOnlyDownloader || hasDownloadableMedia(context));
+        wrapper.style.display = visible ? '' : 'none';
+    }
+
+    function refreshDownloadButtonVisibility() {
+        document.querySelectorAll('[data-x-dl-wrapper]').forEach(updateDownloadButtonVisibility);
     }
 
     // =========================================================================
@@ -563,7 +721,7 @@
         // matches sibling buttons that show counts like "8", "102" etc.
         // An empty div collapses to 0px and the icon ends up misaligned.
         const countSpacer = hasCountSpacer
-            ? `<div class="css-175oi2r r-xoduu5 r-1udh08x" aria-hidden="true">
+            ? `<div class="css-g5y9jx r-xoduu5 r-1udh08x" aria-hidden="true">
                 <span style="visibility:hidden;pointer-events:none;" aria-hidden="true">
                     <span class="css-1jxf684 r-1ttztb7 r-qvutc0 r-poiln3 r-n6v787 r-1cwl3u0 r-1k6nrdp r-n7gxbd">
                         <span class="css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3">0</span>
@@ -576,12 +734,12 @@
         wrapper.innerHTML = `
             <button aria-label="${i18n.t('downloaderAriaLabel')}" role="button"
                 data-testid="download-media" type="button"
-                class="css-175oi2r r-1777fci r-bt1l66 r-bztko3 r-lrvibr r-1loqt21 r-1ny4l3l">
+                class="css-g5y9jx r-1777fci r-bt1l66 r-bztko3 r-lrvibr r-1loqt21 r-1ny4l3l">
                 <div dir="ltr"
                     class="css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-a023e6 r-rjixqe r-16dba41 r-1awozwy r-6koalj r-1h0z5md r-o7ynqc r-clp7b1 r-3s2u2q"
                     style="color:${color}">
-                    <div class="css-175oi2r r-xoduu5">
-                        <div class="css-175oi2r r-xoduu5 r-1p0dtai r-1d2f490 r-u8s1d r-zchlnj r-ipm5af r-1niwhzg r-sdzlij r-xf4iuw r-o7ynqc r-6416eg r-1ny4l3l"></div>
+                    <div class="css-g5y9jx r-xoduu5">
+                        <div class="css-g5y9jx r-xoduu5 r-1p0dtai r-1d2f490 r-u8s1d r-zchlnj r-ipm5af r-1niwhzg r-sdzlij r-xf4iuw r-o7ynqc r-6416eg r-1ny4l3l"></div>
                         <svg viewBox="0 0 24 24" aria-hidden="true" class="${sc}">
                             <g><path d="M12 16.59l-5.7-5.7 1.41-1.42L11 12.76V3h2v9.76l3.3-3.3 1.41 1.42L12 16.59zM3 21v-3.5h2V19h14v-1.5h2V21H3z"/></g>
                         </svg>
@@ -594,7 +752,6 @@
     }
 
     function addDownloadButtonToTweet(tweet) {
-        if (tweet.dataset.downloadButtonAdded) return;
         // If downloader or extension is disabled, mark as processed but don't inject
         if (!settings.extensionEnabled || !settings.downloaderEnabled) return;
         
@@ -602,10 +759,16 @@
         if (!actionBar) return;
 
         // Prevent double injection if multiple triggers find the same action bar
-        if (actionBar.querySelector('[data-testid="download-media"]')) {
+        const existingButton = actionBar.querySelector('[data-testid="download-media"]');
+        if (existingButton) {
             tweet.dataset.downloadButtonAdded = 'true';
+            updateDownloadButtonVisibility(existingButton.closest('[data-x-dl-wrapper]'));
             return;
         }
+
+        // The compact mode avoids adding an action to text-only posts. If media
+        // is hydrated later, MutationObserver will call this function again.
+        if (settings.mediaOnlyDownloader && !hasDownloadableMedia(tweet)) return;
 
         // Detect SVG class and COLOR from an existing sibling button to match page style.
         // Post page uses larger icons, homeUses smaller. Photo view uses white instead of gray.
@@ -619,7 +782,7 @@
         const bookmarkWrapperClass = bookmarkEl?.parentElement?.className || 'css-175oi2r r-18u37iz r-1h0z5md r-1wron08';
         
         // r-13awgt0 = post/photo view: every sibling button has a count-label spacer div.
-        const hasCountSpacer = bookmarkWrapperClass.includes('r-13awgt0') || actionBar.className.includes('r-1kbdv8c');
+        const hasCountSpacer = bookmarkWrapperClass.includes('r-13awgt0');
         
         const wrapper = createDownloadButton(sibClass, bookmarkWrapperClass, hasCountSpacer, iconColor);
         wrapper.setAttribute('data-x-dl-wrapper', '');  // marker for toggle visibility
@@ -638,6 +801,7 @@
             const shareWrapper = actionBar.querySelector('[style*="inline-grid"]');
             shareWrapper ? actionBar.insertBefore(wrapper, shareWrapper) : actionBar.appendChild(wrapper);
         }
+        updateDownloadButtonVisibility(wrapper);
         tweet.dataset.downloadButtonAdded = 'true';
     }
 
@@ -645,8 +809,112 @@
     // AD BLOCKING
     // =========================================================================
 
-    const AD_LABELS = ['Reklam', 'Ad', 'Promoted'];
+    const AD_LABELS = ['Reklam', 'Ad'];
+    const PROMOTED_LABELS = ['Promoted', 'Öne çıkarıldı'];
     let isBlocking = false;
+
+    function normalizeLabelText(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function tweetHasLabel(tweetElement, labels) {
+        return [...tweetElement.querySelectorAll('span')].some(span => {
+            if (!labels.includes(normalizeLabelText(span.textContent))) return false;
+            if (span.closest('[data-testid="tweetText"]')) return false;
+
+            const owningTweet = span.closest('article[data-testid="tweet"]');
+            return owningTweet === tweetElement;
+        });
+    }
+
+    function resetTweetProcessingState(scope = 'all') {
+        for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
+            if (scope === 'all' || scope === 'ad') delete tweet.dataset.adProcessed;
+            if (scope === 'all' || scope === 'promoted') delete tweet.dataset.promotedProcessed;
+            if (scope === 'all' || scope === 'filter') delete tweet.dataset.filterProcessed;
+        }
+    }
+
+    function tweetMatchesFilter(tweetElement) {
+        const rules = normalizeFilterRules(settings.filterRules);
+        if (!rules.length) return false;
+
+        const tweetText = tweetElement.querySelector('[data-testid="tweetText"]')?.textContent || '';
+        const authorText = tweetElement.querySelector('[data-testid="User-Name"]')?.textContent || '';
+        const haystack = `${tweetText} ${authorText}`.replace(/\s+/g, ' ').trim().toLowerCase();
+        return rules.some(rule => haystack.includes(rule.toLowerCase()));
+    }
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[character]));
+    }
+
+    function recordBlockedAccount(handle, displayName, reason = 'ad') {
+        const key = handle || displayName || '@Sponsored';
+        const category = reason === 'promoted' ? 'promoted' : 'ad';
+        const categoryHandlesKey = category === 'promoted' ? 'promotedBlockedHandles' : 'adBlockedHandles';
+        const categoryCountKey = category === 'promoted' ? 'promotedBlockedCount' : 'adBlockedCount';
+
+        safeStorageGet([
+            'blockedCount', 'blockedHandles', 'blockedHistory',
+            'adBlockedCount', 'adBlockedHandles',
+            'promotedBlockedCount', 'promotedBlockedHandles'
+        ], result => {
+            const handles = Array.isArray(result?.blockedHandles) ? [...result.blockedHandles] : [];
+            const categoryHandles = Array.isArray(result?.[categoryHandlesKey])
+                ? [...result[categoryHandlesKey]]
+                : [];
+            const history = Array.isArray(result?.blockedHistory)
+                ? result.blockedHistory.filter(item => item && typeof item === 'object')
+                : [];
+
+            const isNewHandle = !handles.includes(key);
+            if (isNewHandle) handles.push(key);
+
+            const isNewCategoryHandle = !categoryHandles.includes(key);
+            if (isNewCategoryHandle) categoryHandles.push(key);
+
+            const entry = {
+                handle: key,
+                displayName: displayName || key,
+                reason: category,
+                timestamp: Date.now()
+            };
+            const historyIndex = history.findIndex(item =>
+                item.handle === key && item.reason === category
+            );
+            if (historyIndex >= 0) history[historyIndex] = { ...history[historyIndex], ...entry };
+            else history.push(entry);
+
+            const currentTotal = Math.max(
+                Number.isFinite(result?.blockedCount) ? result.blockedCount : 0,
+                handles.length - (isNewHandle ? 1 : 0)
+            );
+            const currentCategoryCount = Math.max(
+                Number.isFinite(result?.[categoryCountKey]) ? result[categoryCountKey] : 0,
+                categoryHandles.length - (isNewCategoryHandle ? 1 : 0)
+            );
+
+            safeStorageSet({
+                blockedHandles: handles,
+                blockedCount: currentTotal + (isNewHandle ? 1 : 0),
+                blockedHistory: history.slice(-500),
+                [categoryHandlesKey]: categoryHandles,
+                [categoryCountKey]: currentCategoryCount + (isNewCategoryHandle ? 1 : 0)
+            });
+        });
+    }
+
+    function handleDetectedTweet(tweetElement, reason) {
+        recordMatch(reason);
+        if (settings.blockMode === 'hide') {
+            hideTweet(tweetElement, reason);
+        } else {
+            blockAdAccount(tweetElement, reason);
+        }
+    }
 
     function blockUserInteractions() {
         let s = document.getElementById('x-adb-shield');
@@ -669,7 +937,7 @@
         document.body.classList.remove('x-ad-blocking-active');
     }
 
-    async function blockAdAccount(tweetElement) {
+    async function blockAdAccount(tweetElement, reason = 'ad') {
         if (isBlocking) return;
         isBlocking = true;
         blockUserInteractions();
@@ -708,18 +976,8 @@
                     for (let i = 0; i < 10 && !confirmBtn; i++) { await sleep(200); confirmBtn = document.querySelector('[data-testid="confirmationSheetConfirm"]'); }
                     if (confirmBtn) {
                         confirmBtn.click();
-                        showToast(`${i18n.t('toastBlocked')} <b>${displayName}</b>`, 'block', '#1da1f2');
-                        safeStorageGet(['blockedCount', 'blockedHandles'], (r) => {
-                            if (!r) return;
-                            const handles = r.blockedHandles || [];
-                            const key = handle || displayName;
-                            const alreadyCounted = handles.includes(key);
-                            if (!alreadyCounted) handles.push(key);
-                            safeStorageSet({
-                                blockedHandles: handles,
-                                blockedCount: alreadyCounted ? (r.blockedCount || 0) : (r.blockedCount || 0) + 1
-                            });
-                        });
+                        showToast(`${i18n.t('toastBlocked')} <b>${escapeHtml(displayName)}</b>`, 'block', '#1da1f2');
+                        recordBlockedAccount(handle, displayName, reason);
                     } else {
                         const cancel = document.querySelector('[data-testid="confirmationSheetCancel"]');
                         if (cancel) cancel.click();
@@ -747,22 +1005,40 @@
         // 1. Process regular tweets in the feed
         for (const tweet of document.querySelectorAll('article[data-testid="tweet"]')) {
             addDownloadButtonToTweet(tweet);
-            if (tweet.dataset.adProcessed) continue;
-            // Only scan for ads if both master switch and ad-block switch are on
-            if (!settings.extensionEnabled || !settings.adBlockEnabled) {
+            if (!settings.extensionEnabled) {
                 tweet.dataset.adProcessed = 'true';
+                tweet.dataset.promotedProcessed = 'true';
+                tweet.dataset.filterProcessed = 'true';
                 continue;
             }
-            let isAd = false;
-            for (const span of tweet.querySelectorAll('span')) {
-                const t = span.textContent.trim();
-                if (AD_LABELS.includes(t)) {
-                    if (tweet.querySelector('[data-testid="tweetText"]')?.contains(span)) continue;
-                    isAd = true; break;
+
+            if (settings.adBlockEnabled && !tweet.dataset.adProcessed) {
+                tweet.dataset.adProcessed = 'true';
+                if (tweetHasLabel(tweet, AD_LABELS)) {
+                    handleDetectedTweet(tweet, 'ad');
+                    return;
+                }
+            } else if (!settings.adBlockEnabled) {
+                tweet.dataset.adProcessed = 'true';
+            }
+
+            if (settings.promotedBlockEnabled && !tweet.dataset.promotedProcessed) {
+                tweet.dataset.promotedProcessed = 'true';
+                if (tweetHasLabel(tweet, PROMOTED_LABELS)) {
+                    handleDetectedTweet(tweet, 'promoted');
+                    return;
+                }
+            } else if (!settings.promotedBlockEnabled) {
+                tweet.dataset.promotedProcessed = 'true';
+            }
+
+            if (!tweet.dataset.filterProcessed) {
+                tweet.dataset.filterProcessed = 'true';
+                if (tweetMatchesFilter(tweet)) {
+                    hideTweet(tweet, 'filter');
+                    return;
                 }
             }
-            tweet.dataset.adProcessed = 'true';
-            if (isAd) { blockAdAccount(tweet); return; }
         }
 
         // 2. Process expanded photo modal (standalone action bar)
@@ -780,17 +1056,33 @@
         }
     }
 
-    function init() {
+    async function init() {
+        await settingsReady;
         let _debounce = null;
         const observer = new MutationObserver(muts => {
             // Auto-disconnect if the extension context was invalidated
             // (e.g. extension reloaded/updated while page was open)
             if (!isContextValid()) { observer.disconnect(); return; }
-            if (!muts.some(m => m.addedNodes.length)) return;
+            if (!muts.some(m => m.addedNodes.length || m.type === 'characterData')) return;
+
+            for (const mutation of muts) {
+                const nodes = [mutation.target, ...mutation.addedNodes];
+                for (const node of nodes) {
+                    const element = node.nodeType === Node.ELEMENT_NODE
+                        ? node
+                        : node.parentElement;
+                    const tweet = element?.closest?.('article[data-testid="tweet"]');
+                    if (!tweet) continue;
+                    delete tweet.dataset.adProcessed;
+                    delete tweet.dataset.promotedProcessed;
+                    delete tweet.dataset.filterProcessed;
+                }
+            }
+
             if (_debounce) clearTimeout(_debounce);
             _debounce = setTimeout(processTweets, 120);
         });
-        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
         processTweets();
     }
 
