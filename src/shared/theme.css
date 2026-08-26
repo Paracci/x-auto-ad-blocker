@@ -1,0 +1,24 @@
+:root {
+    /* Shared X-native palette used by the extension popup and the landing page. */
+    --x-bg-main: #000000;
+    --x-bg-secondary: #0e0e0e;
+    --x-bg-card: #16181c;
+    --x-bg-card-hover: #1d1f23;
+    --x-border: rgba(255, 255, 255, 0.08);
+    --x-border-strong: rgba(255, 255, 255, 0.14);
+
+    --x-blue: #1d9bf0;
+    --x-blue-hover: #1a8cd8;
+    --x-blue-glow: rgba(29, 155, 240, 0.15);
+    --x-blue-border: rgba(29, 155, 240, 0.28);
+    --x-red: #f4212e;
+    --x-green: #00ba7c;
+    --x-green-glow: rgba(0, 186, 124, 0.15);
+
+    --x-text-primary: #e7e9ea;
+    --x-text-secondary: #71767b;
+    --x-text-muted: #3e4144;
+
+    --x-radius-sm: 8px;
+    --x-radius-card: 14px;
+}

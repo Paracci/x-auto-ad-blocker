@@ -4,2307 +4,643 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- SEO & Open Graph Meta Tags -->
-  <title>X Auto Ad Blocker — Block Ads. Download Media. Own Your Feed.</title>
+  <meta name="theme-color" content="#000000">
   <meta name="description"
-    content="A lightweight Chrome extension that permanently blocks advertisers on X and lets you save videos, GIFs and images — all client-side, no data ever collected.">
+    content="A privacy-first Chrome extension for X that detects sponsored posts, lets you hide or block advertiser accounts, and downloads videos, GIFs, and images.">
   <meta property="og:title" content="X Auto Ad Blocker">
   <meta property="og:description"
-    content="A lightweight Chrome extension that permanently blocks advertisers on X and lets you save videos, GIFs and images. 100% Client-side.">
+    content="A privacy-first Chrome extension for X with local controls, media downloads, and no third-party telemetry.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://github.com/Paracci/x-auto-ad-blocker">
+  <meta property="og:url" content="https://paracci.github.io/x-auto-ad-blocker/">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="X Auto Ad Blocker">
-  <meta name="twitter:description" content="Block advertisers on X automatically and download media. Zero telemetry.">
-  <!-- Favicon -->
+  <meta name="twitter:description"
+    content="Choose how sponsored posts are handled, download media, and keep your settings on your device.">
+  <title>X Auto Ad Blocker — Take back your X feed</title>
+
   <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><path fill=%22%231d9bf0%22 d=%22M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z%22/></svg>">
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><path fill=%22%23e7e9ea%22 d=%22M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z%22/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <style>
-    :root {
-      --x-blue: #1d9bf0;
-      --x-blue-dim: #1a8cd8;
-      --x-blue-glow: rgba(29, 155, 240, 0.10);
-      --x-blue-border: rgba(29, 155, 240, 0.22);
-      --x-green: #00ba7c;
-      --x-green-glow: rgba(0, 186, 124, 0.15);
-      --x-green-border: rgba(0, 186, 124, 0.35);
-      --x-red: #f4212e;
-      --bg: #000;
-      --bg2: #0a0a0a;
-      --bg3: #111;
-      --bg4: #161616;
-      --border: rgba(255, 255, 255, 0.07);
-      --border2: rgba(255, 255, 255, 0.12);
-      --t1: #e7e9ea;
-      --t2: #71767b;
-      --t3: #3e4144;
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      scrollbar-width: thin;
-      scrollbar-color: #333639 var(--bg);
-    }
-
-    /* ── CUSTOM SCROLLBAR ── */
-    ::-webkit-scrollbar {
-      width: 10px;
-      background: var(--bg);
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #222;
-      border: 2px solid var(--bg);
-      border-radius: 999px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #333;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--t1);
-      font-family: 'DM Sans', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    /* ── NOISE TEXTURE OVERLAY ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-      background-size: 44px 44px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ── TOP BLUE BAR ── */
-    body::after {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent 0%, var(--x-blue) 30%, var(--x-blue) 70%, transparent 100%);
-      z-index: 1000;
-    }
-
-    /* ── NAV ── */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 999;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 40px;
-      height: 60px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(0, 0, 0, 0.82);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-    }
-
-    .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--t1);
-      text-decoration: none;
-    }
-
-    .nav-logo svg {
-      width: 22px;
-      height: 22px;
-      fill: var(--t1);
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .nav-link {
-      color: var(--t2);
-      text-decoration: none;
-      font-size: 13.5px;
-      font-weight: 500;
-      padding: 6px 14px;
-      border-radius: 999px;
-      transition: all 0.2s;
-    }
-
-    .nav-link:hover {
-      color: var(--t1);
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .nav-cta {
-      background: var(--x-blue);
-      color: #fff !important;
-      padding: 7px 18px;
-      border-radius: 999px;
-      font-weight: 600;
-      font-size: 13px;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-
-    .nav-cta:hover {
-      background: #1a8cd8 !important;
-      color: #fff !important;
-    }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      padding: 120px 40px 80px;
-      max-width: 1200px;
-      margin: 0 auto;
-      gap: 80px;
-    }
-
-    .hero-glow {
-      position: absolute;
-      top: 20%;
-      left: -10%;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(29, 155, 240, 0.08) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      flex: 1;
-      max-width: 560px;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      color: var(--x-blue);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 5px 12px;
-      border-radius: 999px;
-      letter-spacing: 0.3px;
-      margin-bottom: 28px;
-      text-transform: uppercase;
-    }
-
-    .hero-badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--x-green);
-      box-shadow: 0 0 8px var(--x-green);
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.4;
-      }
-    }
-
-    h1 {
-      font-size: clamp(36px, 5vw, 60px);
-      font-weight: 700;
-      line-height: 1.08;
-      letter-spacing: -1.5px;
-      color: var(--t1);
-      margin-bottom: 22px;
-    }
-
-    h1 .accent {
-      color: var(--x-blue);
-    }
-
-    .hero-sub {
-      font-size: 17px;
-      font-weight: 400;
-      color: var(--t2);
-      line-height: 1.65;
-      margin-bottom: 36px;
-      max-width: 480px;
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--x-blue);
-      color: #fff;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 600;
-      font-family: 'DM Sans', sans-serif;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-
-    .btn-primary:hover {
-      background: #1a8cd8;
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: transparent;
-      color: var(--t1);
-      border: 1px solid var(--border2);
-      padding: 12px 24px;
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 500;
-      font-family: 'DM Sans', sans-serif;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .hero-stats {
-      display: flex;
-      gap: 32px;
-      margin-top: 44px;
-      padding-top: 32px;
-      border-top: 1px solid var(--border);
-    }
-
-    .hero-stat-val {
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      color: var(--t1);
-    }
-
-    .hero-stat-label {
-      font-size: 12px;
-      color: var(--t2);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 3px;
-      font-weight: 500;
-    }
-
-    /* ── POPUP MOCKUP (actual extension UI) ── */
-    .hero-visual {
-      position: relative;
-      z-index: 1;
-      flex-shrink: 0;
-    }
-
-    .browser-frame {
-      background: var(--bg3);
-      border: 1px solid var(--border2);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 40px 80px rgba(0, 0, 0, 0.6);
-    }
-
-    .browser-bar {
-      background: var(--bg4);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-    }
-
-    .browser-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .browser-dot.r {
-      background: #ff5f57;
-    }
-
-    .browser-dot.y {
-      background: #febc2e;
-    }
-
-    .browser-dot.g {
-      background: #28c840;
-    }
-
-    .browser-bar-url {
-      flex: 1;
-      text-align: center;
-      font-size: 11px;
-      color: var(--t3);
-      font-family: 'DM Mono', monospace;
-    }
-
-    /* ── EXACT POPUP REPLICA ── */
-    .ext-popup {
-      width: 460px;
-      height: 360px;
-      background: #000;
-      color: #e7e9ea;
-      overflow: hidden;
-      font-family: 'DM Sans', sans-serif;
-      display: flex;
-    }
-
-    .ext-content {
-      flex: 1;
-      min-width: 0;
-      padding: 20px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: #333639 transparent;
-    }
-
-    .ext-content::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .ext-content::-webkit-scrollbar-thumb {
-      background: #333639;
-      border-radius: 4px;
-    }
-
-    .ext-card {
-      background: #16181c;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-    }
-
-    .ext-card-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .ext-row-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: #e7e9ea;
-    }
-
-    .ext-row-sub {
-      font-size: 12px;
-      color: #71767b;
-      margin-top: 2px;
-    }
-
-    .ext-status-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-    }
-
-    .ext-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #00ba7c;
-      box-shadow: 0 0 6px #00ba7c;
-      flex-shrink: 0;
-    }
-
-    .ext-status-text {
-      font-size: 13px;
-      font-weight: 500;
-      color: #00ba7c;
-    }
-
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 40px;
-      height: 22px;
-      flex-shrink: 0;
-    }
-
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .toggle-switch .slider {
-      position: absolute;
-      cursor: pointer;
-      inset: 0;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      transition: 0.25s;
-    }
-
-    .toggle-switch .slider::before {
-      content: '';
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      left: 2px;
-      bottom: 2px;
-      background: var(--t2);
-      border-radius: 50%;
-      transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    }
-
-    .toggle-switch input:checked+.slider {
-      background: var(--x-blue);
-      border-color: transparent;
-    }
-
-    .toggle-switch input:checked+.slider::before {
-      transform: translateX(18px);
-      background: #fff;
-    }
-
-    .ext-stats {
-      display: flex;
-      align-items: center;
-    }
-
-    .ext-stat-block {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex: 1;
-      padding: 10px 0;
-    }
-
-    .ext-stat-val {
-      font-size: 34px;
-      font-weight: 600;
-      color: #e7e9ea;
-      letter-spacing: -1px;
-      line-height: 1;
-    }
-
-    .ext-stat-label {
-      font-size: 11px;
-      color: #71767b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 4px;
-      font-weight: 500;
-    }
-
-    .ext-btn-manage {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 8px 0;
-      margin-top: 14px;
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      color: var(--x-blue);
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .ext-btn-manage:hover {
-      background: var(--x-blue);
-      color: #fff;
-    }
-
-    .ext-stat-divider {
-      width: 1px;
-      height: 40px;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .ext-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(29, 155, 240, 0.15);
-      color: #1d9bf0;
-      white-space: nowrap;
-    }
-
-    .ext-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .ext-header svg {
-      width: 28px;
-      height: 28px;
-      fill: #e7e9ea;
-      flex-shrink: 0;
-    }
-
-    .ext-header h1 {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.3px;
-      color: #e7e9ea;
-    }
-
-    /* Sidebar */
-    .ext-sidebar {
-      width: 140px;
-      flex-shrink: 0;
-      background: #000;
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      flex-direction: column;
-      padding: 20px 8px;
-    }
-
-    .ext-nav {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .ext-nav-item {
-      background: transparent;
-      border: none;
-      color: #71767b;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      min-height: 40px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 400;
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-      width: 100%;
-      transition: all 0.15s;
-    }
-
-    .ext-nav-item svg {
-      fill: #71767b;
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    .ext-nav-item.active {
-      color: #e7e9ea;
-      font-weight: 600;
-    }
-
-    .ext-nav-item.active svg {
-      fill: #e7e9ea;
-    }
-
-    .ext-footer {
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      text-align: center;
-    }
-
-    .ext-credit-text {
-      font-size: 11px;
-      color: #3e4144;
-      display: block;
-    }
-
-    .ext-credit-brand {
-      font-size: 12px;
-      font-weight: 600;
-      color: #71767b;
-      display: block;
-      margin-top: 2px;
-    }
-
-    /* ── SECTION WRAPPER ── */
-    section {
-      position: relative;
-      z-index: 1;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 100px 40px;
-    }
-
-    .section-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--x-blue);
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      padding: 5px 13px;
-      border-radius: 999px;
-      margin-bottom: 20px;
-    }
-
-    .section-title {
-      font-size: clamp(28px, 3.5vw, 44px);
-      font-weight: 700;
-      letter-spacing: -1px;
-      line-height: 1.1;
-      color: var(--t1);
-      margin-bottom: 16px;
-    }
-
-    .section-sub {
-      font-size: 16px;
-      color: var(--t2);
-      line-height: 1.6;
-      max-width: 520px;
-    }
-
-    /* ── DIVIDER ── */
-    .section-divider {
-      width: 100%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border2) 30%, var(--border2) 70%, transparent);
-    }
-
-    /* ── FEATURES GRID ── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 60px;
-    }
-
-    .feature-card {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 28px;
-      position: relative;
-      overflow: visible;
-      transition: border-color 0.25s, transform 0.25s;
-    }
-
-    .feature-card:hover {
-      border-color: rgba(29, 155, 240, 0.3);
-      transform: translateY(-3px);
-    }
-
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      border-radius: 18px 18px 0 0;
-      background: linear-gradient(90deg, transparent, rgba(29, 155, 240, 0.4), transparent);
-      opacity: 0;
-      transition: opacity 0.25s;
-    }
-
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-
-    .feature-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 18px;
-    }
-
-    .feature-icon svg {
-      width: 20px;
-      height: 20px;
-      fill: var(--x-blue);
-    }
-
-    .feature-card h3 {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--t1);
-      margin-bottom: 8px;
-      letter-spacing: -0.2px;
-    }
-
-    .feature-card p {
-      font-size: 13.5px;
-      color: var(--t2);
-      line-height: 1.65;
-    }
-
-    .feature-card.wide {
-      grid-column: span 2;
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
-    }
-
-    .feature-card.wide .feature-text {
-      flex: 1;
-    }
-
-    /* ── HOW IT WORKS ── */
-    .how-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 80px;
-      align-items: center;
-      margin-top: 60px;
-    }
-
-    .how-split-right {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .step-row {
-      display: flex;
-      gap: 18px;
-      align-items: flex-start;
-      opacity: 0;
-      transform: translateY(16px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-
-    .step-row.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .step-num {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 1px solid var(--border2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--x-blue);
-      flex-shrink: 0;
-      margin-top: 2px;
-      font-family: 'DM Mono', monospace;
-    }
-
-    .step-body h4 {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--t1);
-      margin-bottom: 5px;
-    }
-
-    .step-body p {
-      font-size: 13px;
-      color: var(--t2);
-      line-height: 1.6;
-    }
-
-    /* ── SETTINGS MOCKUP ── */
-    .settings-mockup {
-      background: #000;
-      border: 1px solid var(--border2);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
-    }
-
-    .settings-popup {
-      width: 100%;
-      height: auto;
-      background: #000;
-      color: #e7e9ea;
-      display: flex;
-    }
-
-    .settings-content {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
-
-    .settings-content::-webkit-scrollbar {
-      display: none;
-    }
-
-    .settings-card {
-      background: #16181c;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-    }
-
-    .settings-h2 {
-      font-size: 11px;
-      font-weight: 600;
-      color: #71767b;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 12px;
-    }
-
-    .settings-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .settings-row+.settings-row {
-      margin-top: 14px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .s-slider {
-      position: relative;
-      width: 40px;
-      height: 22px;
-      flex-shrink: 0;
-    }
-
-    .s-slider-track {
-      position: absolute;
-      inset: 0;
-      border-radius: 22px;
-    }
-
-    .s-slider-thumb {
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      top: 3px;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    }
-
-    /* ── PRIVACY SECTION ── */
-    .privacy-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 50px;
-    }
-
-    .privacy-card {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 28px;
-    }
-
-    .privacy-icon {
-      font-size: 24px;
-      margin-bottom: 14px;
-      display: block;
-    }
-
-    .privacy-card h3 {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--t1);
-      margin-bottom: 8px;
-    }
-
-    .privacy-card p {
-      font-size: 13px;
-      color: var(--t2);
-      line-height: 1.65;
-    }
-
-    /* ── INSTALL ── */
-    .install-box {
-      background: var(--bg4);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      overflow: hidden;
-      display: grid;
-      grid-template-columns: 1fr 280px;
-      margin-top: 50px;
-    }
-
-    .install-steps {
-      padding: 36px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .install-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      font-size: 14px;
-      color: var(--t2);
-      line-height: 1.6;
-    }
-
-    .install-step-num {
-      width: 24px;
-      height: 24px;
-      border-radius: 8px;
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--x-blue);
-      flex-shrink: 0;
-      font-family: 'DM Mono', monospace;
-      margin-top: 1px;
-    }
-
-    .install-step strong {
-      color: var(--t1);
-    }
-
-    .code-tag {
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid var(--border2);
-      border-radius: 5px;
-      padding: 1px 7px;
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: #8ab4f8;
-    }
-
-    .install-cta {
-      background: var(--bg3);
-      border-left: 1px solid var(--border);
-      padding: 36px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 12px;
-    }
-
-    .install-cta h3 {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--t1);
-      letter-spacing: -0.4px;
-    }
-
-    .install-cta p {
-      font-size: 13px;
-      color: var(--t2);
-    }
-
-    /* ── FOOTER ── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 32px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .footer-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--t2);
-      text-decoration: none;
-    }
-
-    .footer-brand svg {
-      width: 18px;
-      height: 18px;
-      fill: var(--t2);
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 24px;
-    }
-
-    .footer-link {
-      font-size: 13px;
-      color: var(--t3);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    .footer-link:hover {
-      color: var(--t2);
-    }
-
-    /* ── ANIMATED COUNTER ── */
-    .counter {
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* ── DOWNLOAD BTN DEMO ── */
-    .tweet-demo {
-      background: var(--bg3);
-      border: 1px solid var(--border2);
-      border-radius: 14px;
-      padding: 18px;
-      margin-top: 28px;
-    }
-
-    .tweet-demo-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .tweet-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #1d9bf0 0%, #0d5c9a 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    .tweet-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--t1);
-    }
-
-    .tweet-handle {
-      font-size: 12px;
-      color: var(--t2);
-    }
-
-    .tweet-text {
-      font-size: 13.5px;
-      color: var(--t1);
-      line-height: 1.55;
-      margin-bottom: 14px;
-    }
-
-    .tweet-media {
-      height: 120px;
-      background: linear-gradient(135deg, #0a1628 0%, #091220 100%);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .play-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .play-icon svg {
-      width: 18px;
-      height: 18px;
-      fill: #fff;
-      margin-left: 2px;
-    }
-
-    .tweet-actions {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    .tweet-action {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 12px;
-      color: var(--t2);
-    }
-
-    .tweet-action svg {
-      width: 16px;
-      height: 16px;
-      fill: var(--t2);
-    }
-
-    .tweet-download-btn {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--x-blue-glow);
-      border: 1px solid var(--x-blue-border);
-      color: var(--x-blue);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 5px 12px;
-      border-radius: 999px;
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-      animation: btnAppear 1.5s ease-out 0.8s both;
-      transition: transform 0.2s, background 0.2s, color 0.2s;
-    }
-
-    .tweet-download-btn:hover {
-      background: var(--x-blue);
-      color: #fff;
-      transform: scale(1.04);
-    }
-
-    .tweet-download-btn:hover svg {
-      fill: #fff;
-    }
-
-    @keyframes btnAppear {
-      0% {
-        opacity: 0;
-        transform: scale(0.8);
-      }
-
-      60% {
-        transform: scale(1.05);
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    .tweet-download-btn svg {
-      width: 13px;
-      height: 13px;
-      fill: var(--x-blue);
-      transition: fill 0.2s;
-    }
-
-    /* ── TOAST DEMO ── */
-    .toast-demo {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 28px;
-    }
-
-    .toast {
-      background: var(--bg4);
-      border: 1px solid var(--border2);
-      border-left: 3px solid var(--x-green);
-      border-radius: 10px;
-      padding: 12px 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      max-width: 340px;
-      animation: toastIn 0.4s ease-out forwards;
-    }
-
-    .toast:nth-child(2) {
-      animation-delay: 0.3s;
-      opacity: 0;
-      animation-fill-mode: both;
-    }
-
-    .toast:nth-child(3) {
-      animation-delay: 0.6s;
-      opacity: 0;
-      animation-fill-mode: both;
-    }
-
-    @keyframes toastIn {
-      from {
-        opacity: 0;
-        transform: translateY(15px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .toast-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: rgba(0, 186, 124, 0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .toast-icon svg {
-      width: 14px;
-      height: 14px;
-      fill: var(--x-green);
-    }
-
-    .toast-text strong {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--t1);
-      display: block;
-    }
-
-    .toast-text span {
-      font-size: 11px;
-      color: var(--t2);
-    }
-
-    /* ── BLOCKED LIST DEMO ── */
-    .blocked-demo {
-      background: #000;
-      border: 1px solid var(--border2);
-      border-radius: 14px;
-      overflow: hidden;
-      margin-top: 28px;
-    }
-
-    .blocked-demo-header {
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--border);
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--t1);
-    }
-
-    .blocked-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 11px 18px;
-      border-bottom: 1px solid var(--border);
-      transition: background 0.2s;
-    }
-
-    .blocked-row:hover {
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .blocked-row:last-child {
-      border-bottom: none;
-    }
-
-    .blocked-handle {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--t1);
-      font-family: 'DM Mono', monospace;
-    }
-
-    .blocked-btn {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border2);
-      background: transparent;
-      color: var(--t1);
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-    }
-
-    /* ── LANG SWITCHER DEMO ── */
-    .lang-demo {
-      background: #16181c;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 16px;
-      margin-top: 20px;
-    }
-
-    .lang-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 10px;
-    }
-
-    .lang-chip {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 12px;
-      color: var(--t2);
-    }
-
-    .lang-chip.active {
-      background: var(--x-blue-dim);
-      border-color: rgba(29, 155, 240, 0.3);
-      color: var(--x-blue);
-      font-weight: 600;
-    }
-
-    /* ── ANIMATIONS ── */
-    .fade-up {
-      opacity: 0;
-      transform: translateY(30px);
-      transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .fade-up.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 900px) {
-      .hero {
-        flex-direction: column;
-        gap: 50px;
-        padding: 100px 24px 60px;
-      }
-
-      .features-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .feature-card.wide {
-        flex-direction: column;
-        grid-column: span 1;
-      }
-
-      .features-grid>div[style*="flex-direction:column"] {
-        grid-column: span 1;
-      }
-
-      .feature-card[style*="grid-column: span 2"] {
-        grid-column: span 1 !important;
-      }
-
-      .how-split {
-        grid-template-columns: 1fr;
-      }
-
-      .privacy-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .install-box {
-        flex-direction: column;
-        padding: 40px 28px;
-      }
-
-      .ext-popup,
-      .settings-popup {
-        width: 100%;
-      }
-
-      nav {
-        padding: 0 20px;
-      }
-
-      section {
-        padding: 70px 24px;
-      }
-
-      footer {
-        flex-direction: column;
-        gap: 20px;
-      }
-    }
-
-    @media (max-width: 600px) {
-      h1 {
-        font-size: 42px;
-      }
-
-      .hero {
-        padding-top: 100px;
-      }
-
-      .nav-links .nav-link {
-        display: none;
-      }
-
-      .hero-actions {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        gap: 12px;
-      }
-
-      .hero-actions a {
-        width: 100%;
-        justify-content: center;
-      }
-
-      .hero-stats {
-        flex-direction: column;
-        gap: 20px;
-        padding-top: 24px;
-      }
-
-      .how-split-right .step-row {
-        flex-direction: column;
-        gap: 8px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="src/shared/theme.css">
+  <link rel="stylesheet" href="landing.css">
 </head>
 
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
 
-  <!-- NAV -->
-  <nav>
-    <a href="#" class="nav-logo">
-      <svg viewBox="0 0 24 24">
-        <path
-          d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
-      </svg>
-      X Ad Blocker
-    </a>
-    <div class="nav-links">
-      <a href="#features" class="nav-link">Features</a>
-      <a href="#how" class="nav-link">How it works</a>
-      <a href="#privacy" class="nav-link">Privacy</a>
-      <a href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank" class="nav-cta">Install Free</a>
-    </div>
-  </nav>
-
-  <!-- HERO -->
-  <div style="position:relative;z-index:1;">
-    <div class="hero-glow"></div>
-    <div class="hero"
-      style="max-width:1200px;margin:0 auto;padding:120px 40px 80px;display:flex;align-items:center;gap:80px;">
-      <div class="hero-content">
-        <div class="hero-badge">Open Source · Zero Telemetry</div>
-        <h1>Block ads.<br><span class="accent">Download media.</span><br>Own your feed.</h1>
-        <p class="hero-sub">A lightweight Chrome extension that permanently blocks advertisers on X and lets you save
-          videos, GIFs and images — all client-side, no data ever collected.</p>
-        <div class="hero-actions">
-          <a href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank" class="btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.74-1.33-1.74-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.005 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z" />
-            </svg>
-            Install from GitHub
-          </a>
-          <a href="#features" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-            </svg>
-            Explore Features
-          </a>
-        </div>
-        <div class="hero-stats">
-          <div>
-            <div class="hero-stat-val">11</div>
-            <div class="hero-stat-label">Languages</div>
-          </div>
-          <div>
-            <div class="hero-stat-val">0</div>
-            <div class="hero-stat-label">Data collected</div>
-          </div>
-          <div>
-            <div class="hero-stat-val">100%</div>
-            <div class="hero-stat-label">Client-side</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ACTUAL POPUP UI EMBEDDED -->
-      <div class="hero-visual">
-        <div class="browser-frame">
-          <div class="browser-bar">
-            <div class="browser-dot r"></div>
-            <div class="browser-dot y"></div>
-            <div class="browser-dot g"></div>
-            <div class="browser-bar-url">x.com — X Ad Blocker active</div>
-          </div>
-          <div class="ext-popup">
-            <div class="ext-content">
-              <div class="ext-header" style="justify-content:space-between; display:flex; align-items:center;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#e7e9ea;flex-shrink:0;">
-                    <path
-                      d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
-                  </svg>
-                  <h1 style="font-size:18px;font-weight:600;letter-spacing:-.3px;color:#e7e9ea;margin:0;"
-                    data-i18n="extName">X Ad Blocker</h1>
-                </div>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="#71767b"
-                  style="cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform='rotate(45deg)'"
-                  onmouseout="this.style.transform='rotate(0deg)'">
-                  <path
-                    d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-                </svg>
-              </div>
-
-              <!-- Status card -->
-              <div class="ext-card">
-                <div class="ext-card-row">
-                  <div>
-                    <div class="ext-row-label">Protection</div>
-                    <div class="ext-status-row">
-                      <div class="ext-dot"></div>
-                      <span class="ext-status-text">Active</span>
-                    </div>
-                  </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Stats card -->
-              <div class="ext-card">
-                <div class="ext-stats">
-                  <div class="ext-stat-block">
-                    <div class="ext-stat-val counter" id="popupBlocked">0</div>
-                    <div class="ext-stat-label">Blocked</div>
-                  </div>
-                  <div class="ext-stat-divider"></div>
-                  <div class="ext-stat-block">
-                    <div class="ext-stat-val counter" id="popupDownloaded">0</div>
-                    <div class="ext-stat-label">Downloaded</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Downloader card -->
-              <div class="ext-card">
-                <div class="ext-card-row">
-                  <div>
-                    <div class="ext-row-label">Media Downloader</div>
-                    <div class="ext-row-sub">Videos, GIFs &amp; images</div>
-                  </div>
-                  <span class="ext-badge">Active</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Sidebar -->
-            <div class="ext-sidebar">
-              <div class="ext-nav">
-                <button class="ext-nav-item active">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-                  </svg>
-                  <span>Home</span>
-                </button>
-                <button class="ext-nav-item">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-                  </svg>
-                  <span>Settings</span>
-                </button>
-                <button class="ext-nav-item">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
-                  </svg>
-                  <span>Blocked</span>
-                </button>
-                <button class="ext-nav-item">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                  </svg>
-                  <span>About</span>
-                </button>
-              </div>
-              <div class="ext-footer">
-                <span class="ext-credit-text">Crafted by</span>
-                <span class="ext-credit-brand">Paracci</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION DIVIDER -->
-  <div class="section-divider"></div>
-
-  <!-- FEATURES -->
-  <section id="features">
-    <div class="section-label">Features</div>
-    <h2 class="section-title">Everything you need.<br>Nothing you don't.</h2>
-    <p class="section-sub">Built for power users who want a cleaner feed and full control over their X experience.</p>
-
-    <div class="features-grid">
-
-      <!-- Feature 1: Wide card — Ad Blocking with tweet demo -->
-      <div class="feature-card wide fade-up">
-        <div class="feature-text">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
-            </svg>
-          </div>
-          <h3>Permanent ad blocking</h3>
-          <p>Doesn't just hide ads — actually blocks the advertiser's account entirely. Uses a debounced
-            MutationObserver to detect "Ad", "Promoted", and "Reklam" labels in real-time, then silently clicks Block →
-            Confirm in the background.</p>
-
-          <!-- Toast notifications demo -->
-        </div>
-
-        <div class="feature-demo-split" style="display:flex;gap:24px;align-items:stretch;">
-          <div class="toast-demo" style="margin-top:0;flex:1;justify-content:center;">
-            <div class="toast" style="max-width:100%;">
-              <div class="toast-icon"><svg viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg></div>
-              <div class="toast-text"><strong>Advertiser blocked</strong><span>@SportsBettingApp — never again</span>
-              </div>
-            </div>
-            <div class="toast" style="max-width:100%;">
-              <div class="toast-icon"><svg viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg></div>
-              <div class="toast-text"><strong>Advertiser blocked</strong><span>@CryptoScamCoin — never again</span>
-              </div>
-            </div>
-            <div class="toast" style="max-width:100%;">
-              <div class="toast-icon"><svg viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg></div>
-              <div class="toast-text"><strong>Advertiser blocked</strong><span>@FakeWeightLoss — never again</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="blocked-demo" style="margin-top:0;flex:1;display:flex;flex-direction:column;">
-            <div class="blocked-demo-header" style="display:flex;align-items:center;gap:8px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#71767b">
-                <path
-                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
-              </svg>
-              Blocked Advertisers
-            </div>
-            <div class="blocked-row">
-              <span class="blocked-handle">@SportsBettingApp</span>
-              <div style="display:flex;gap:6px;">
-                <button class="blocked-btn">View on X</button>
-              </div>
-            </div>
-            <div class="blocked-row">
-              <span class="blocked-handle">@CryptoScamCoin</span>
-              <div style="display:flex;gap:6px;">
-                <button class="blocked-btn">View on X</button>
-              </div>
-            </div>
-            <div class="blocked-row">
-              <span class="blocked-handle">@FakeWeightLoss</span>
-              <div style="display:flex;gap:6px;">
-                <button class="blocked-btn">View on X</button>
-              </div>
-            </div>
-            <div class="blocked-row" style="border-bottom:none;">
-              <span class="blocked-handle">@MobileGame2024</span>
-              <div style="display:flex;gap:6px;">
-                <button class="blocked-btn">View on X</button>
-              </div>
-            </div>
-            <div class="blocked-demo-footer"
-              style="padding:10px 14px;font-size:11px;color:var(--t3);text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
-              Showing 4 of 247 items
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Feature 2: Media Downloader -->
-      <div class="feature-card fade-up">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5z" />
-          </svg>
-        </div>
-        <h3>Media downloader</h3>
-        <p>Saves highest-bitrate MP4 videos, GIFs, and full-resolution images. Uses X's own Syndication API — no blob
-          hacks or network interception.</p>
-
-        <!-- Tweet with download button mockup -->
-        <div class="tweet-demo">
-          <div class="tweet-demo-header">
-            <div class="tweet-avatar">X</div>
-            <div>
-              <div class="tweet-name">X User</div>
-              <div class="tweet-handle">@xuser · 2h</div>
-            </div>
-          </div>
-          <div class="tweet-text">Check out this amazing video from the weekend 🎬</div>
-          <div class="tweet-media">
-            <div class="play-icon">
-              <svg viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </div>
-          <div class="tweet-actions">
-            <div class="tweet-action">
-              <svg viewBox="0 0 24 24">
-                <path
-                  d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 7.879 3.77 7.879 8.25 0 4.44-3.512 8.25-7.879 8.25H8.756l-1.176 1.094c-.918.86-2.338.837-3.227-.047-.883-.878-.876-2.293.006-3.163l.957-.887A7.875 7.875 0 0 1 1.751 10z" />
-              </svg> 48
-            </div>
-            <div class="tweet-action">
-              <svg viewBox="0 0 24 24">
-                <path
-                  d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.805-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91z" />
-              </svg> 234
-            </div>
-            <div class="tweet-download-btn">
-              <svg viewBox="0 0 24 24">
-                <path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5z" />
-              </svg>
-              Download
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Feature 3 + 5: stacked in left column -->
-      <div style="display:flex;flex-direction:column;gap:16px;">
-
-        <!-- Feature 3: Multi-language -->
-        <div class="feature-card fade-up" style="flex:1;">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z" />
-            </svg>
-          </div>
-          <h3>11 languages, zero flash</h3>
-          <p>Auto-detects your browser language. Manually override from Settings. i18n is awaited before any DOM paint —
-            no English flickering on first load.</p>
-
-          <div class="lang-demo">
-            <div style="font-size:12px;color:#71767b;font-weight:500;">Interface Language</div>
-            <div class="lang-chips">
-              <div class="lang-chip active">English</div>
-              <div class="lang-chip">Türkçe</div>
-              <div class="lang-chip">Deutsch</div>
-              <div class="lang-chip">Français</div>
-              <div class="lang-chip">Español</div>
-              <div class="lang-chip">日本語</div>
-              <div class="lang-chip">한국어</div>
-              <div class="lang-chip">中文</div>
-              <div class="lang-chip">Русский</div>
-              <div class="lang-chip">Português</div>
-              <div class="lang-chip">Italiano</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Feature 5: Live Stats -->
-        <div class="feature-card fade-up" style="flex:1;">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" />
-            </svg>
-          </div>
-          <h3>Live statistics</h3>
-          <p>Counters update in real-time via <span
-              style="font-family:'DM Mono',monospace;font-size:12px;color:var(--x-blue);">chrome.storage.onChanged</span>
-            even while the popup is open. Animated number roll on every update.</p>
-
-          <!-- Mini stat counter demo -->
-          <div
-            style="display:flex;gap:0;margin-top:20px;background:#16181c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:16px 0;">
-              <div style="font-size:30px;font-weight:700;color:#e7e9ea;letter-spacing:-1px;line-height:1;"
-                id="demoBlocked">0</div>
-              <div style="font-size:10px;color:#71767b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">
-                Blocked</div>
-            </div>
-            <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:16px 0;">
-              <div style="font-size:30px;font-weight:700;color:#e7e9ea;letter-spacing:-1px;line-height:1;"
-                id="demoDown">0
-              </div>
-              <div style="font-size:10px;color:#71767b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">
-                Downloaded</div>
-            </div>
-          </div>
-        </div><!-- /Feature 5 -->
-
-      </div><!-- /stacked column (F3+F5) -->
-
-      <!-- Feature 4: Settings UI — wide (span 2) -->
-      <div class="feature-card fade-up" style="grid-column: span 2;">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-          </svg>
-        </div>
-        <h3>Granular controls</h3>
-        <p>Toggle ad blocking, media downloader, and toast notifications independently. Settings sync live to all open X
-          tabs — no refresh needed.</p>
-
-        <!-- Settings mockup -->
-        <div class="settings-mockup" style="margin-top:18px;">
-          <div class="settings-popup">
-            <div class="settings-content">
-              <div class="settings-card">
-                <div class="settings-h2">Ad Blocking</div>
-                <div class="settings-row">
-                  <div>
-                    <div style="font-size:13px;font-weight:500;color:#e7e9ea;">Auto-block advertisers</div>
-                    <div style="font-size:11px;color:#71767b;margin-top:2px;">Permanently blocks the account</div>
-                  </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                  </label>
-                </div>
-                <div class="settings-row">
-                  <div>
-                    <div style="font-size:13px;font-weight:500;color:#e7e9ea;">Show toast notifications</div>
-                    <div style="font-size:11px;color:#71767b;margin-top:2px;">Confirm when an ad is blocked</div>
-                  </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-              <div class="settings-card">
-                <div class="settings-h2">Media Downloader</div>
-                <div class="settings-row">
-                  <div>
-                    <div style="font-size:13px;font-weight:500;color:#e7e9ea;">Show download button</div>
-                    <div style="font-size:11px;color:#71767b;margin-top:2px;">Inject button into every tweet</div>
-                  </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-              <div class="settings-card">
-                <div class="settings-h2">Options</div>
-                <div class="settings-row">
-                  <div>
-                    <div style="font-size:13px;font-weight:500;color:#e7e9ea;" data-i18n="langPref">Language Settings
-                    </div>
-                    <div style="font-size:11px;color:#71767b;margin-top:2px;">Override auto-detection</div>
-                  </div>
-                  <select
-                    style="background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;outline:none;">
-                    <option>Auto (Browser)</option>
-                    <option>English</option>
-                    <option>Türkçe</option>
-                    <option>Deutsch</option>
-                    <option>Français</option>
-                    <option>Español</option>
-                    <option>Português</option>
-                    <option>Italiano</option>
-                    <option>Русский</option>
-                    <option>日本語</option>
-                    <option>한국어</option>
-                    <option>中文</option>
-                  </select>
-                </div>
-              </div>
-
-              <button class="ext-btn-manage"
-                style="background:transparent;border:1px solid rgba(244,33,46,0.3);color:var(--x-red);margin-top:16px;">Reset
-                Extension Data</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- HOW IT WORKS -->
-    <section id="how">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">Smart. Silent. Surgical.</h2>
-      <p class="section-sub">Under the hood, X Ad Blocker uses X's own interface and API — no network-level hacks, no
-        filter lists to maintain.</p>
-
-      <div class="how-split">
-        <!-- Left: settings page mockup -->
-        <div>
-          <div class="browser-frame" style="box-shadow:0 20px 50px rgba(0,0,0,0.5);">
-            <div class="browser-bar">
-              <div class="browser-dot r"></div>
-              <div class="browser-dot y"></div>
-              <div class="browser-dot g"></div>
-              <div class="browser-bar-url">chrome-extension://... · popup</div>
-            </div>
-            <!-- About page mockup -->
-            <div style="width:100%;height:auto;background:#000;display:flex;">
-              <div style="flex:1;padding:20px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-                  <div style="font-size:18px;font-weight:600;color:#e7e9ea;">About</div>
-                </div>
-                <div
-                  style="background:#16181c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;margin-bottom:10px;">
-                  <div style="font-size:14px;font-weight:500;color:#e7e9ea;margin-bottom:8px;">Version 1.0.0</div>
-                  <div style="font-size:12px;color:#71767b;line-height:1.6;">Automatically blocks advertisers on X and
-                    lets you download videos, GIFs and images — all client-side, no data collected.</div>
-                </div>
-                <div
-                  style="background:#16181c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;margin-bottom:10px;">
-                  <div
-                    style="font-size:11px;font-weight:600;color:#71767b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">
-                    How it works</div>
-                  <div style="font-size:12px;color:#71767b;line-height:1.7;">
-                    • Detects ad labels via MutationObserver<br>
-                    • Silently clicks Block → Confirm<br>
-                    • Uses X's Syndication API for media
-                  </div>
-                </div>
-                <div
-                  style="background:#16181c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;">
-                  <div
-                    style="font-size:11px;font-weight:600;color:#71767b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">
-                    Privacy</div>
-                  <div style="font-size:12px;color:#71767b;line-height:1.6;">No data is collected or transmitted. The
-                    only
-                    external request is to cdn.syndication.twimg.com.</div>
-                </div>
-              </div>
-              <div class="ext-sidebar" style="width:120px;">
-                <div class="ext-nav">
-                  <button class="ext-nav-item" style="font-size:11px;"><svg viewBox="0 0 24 24"
-                      style="width:16px;height:16px;fill:#71767b;">
-                      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-                    </svg><span>Home</span></button>
-                  <button class="ext-nav-item" style="font-size:11px;"><svg viewBox="0 0 24 24"
-                      style="width:16px;height:16px;fill:#71767b;">
-                      <path
-                        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-                    </svg><span>Settings</span></button>
-                  <button class="ext-nav-item" style="font-size:11px;"><svg viewBox="0 0 24 24"
-                      style="width:16px;height:16px;fill:#71767b;">
-                      <path
-                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
-                    </svg><span>Blocked</span></button>
-                  <button class="ext-nav-item active" style="font-size:11px;"><svg viewBox="0 0 24 24"
-                      style="width:16px;height:16px;fill:#e7e9ea;">
-                      <path
-                        d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                    </svg><span>About</span></button>
-                </div>
-                <div class="ext-footer"><span class="ext-credit-text">Crafted by</span><span
-                    class="ext-credit-brand">Paracci</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right: steps -->
-        <div class="how-split-right">
-          <div class="step-row">
-            <div class="step-num">01</div>
-            <div class="step-body">
-              <h4>Smart detection</h4>
-              <p>A debounced MutationObserver watches for new tweets with 120ms batching. It scans span text for ad
-                labels
-                outside the tweet body — no false positives on normal content.</p>
-            </div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">02</div>
-            <div class="step-body">
-              <h4>Invisible blocking engine</h4>
-              <p>Injects a custom stylesheet that hides the block dropdown and confirmation modal only during the active
-                block operation. A temporary full-screen overlay prevents accidental clicks.</p>
-            </div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">03</div>
-            <div class="step-body">
-              <h4>Deduplicated handles</h4>
-              <p>Each advertiser's @handle is stored in <span class="code-tag">blockedHandles</span>. Same advertiser
-                appearing twice? Block fires again (ad removed) but the counter doesn't increment.</p>
-            </div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">04</div>
-            <div class="step-body">
-              <h4>Syndication API for media</h4>
-              <p>Requests <span class="code-tag">cdn.syndication.twimg.com</span> via the background service worker
-                (bypassing CORS). Picks highest-bitrate MP4. Blob-downloads with a clean filename — no double
-                extensions.
-              </p>
-            </div>
-          </div>
-          <div class="step-row">
-            <div class="step-num">05</div>
-            <div class="step-body">
-              <h4>Hydration-aware retries</h4>
-              <p>Waits for X's React hydration cycles instead of using hardcoded delays. Re-scans buffered tweets when
-                the
-                ad blocker is re-enabled — nothing slips through.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="section-divider"></div>
-
-    <!-- PRIVACY -->
-    <section id="privacy">
-      <div class="section-label">Privacy</div>
-      <h2 class="section-title">Zero telemetry.<br>Zero compromise.</h2>
-      <p class="section-sub">X Ad Blocker was designed from the ground up with privacy as a first principle — not an
-        afterthought.</p>
-
-      <div class="privacy-grid">
-        <div class="privacy-card">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--x-green)"
-            style="margin-bottom:14px;display:block;">
-            <path
-              d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
-          </svg>
-          <h3>No data collected</h3>
-          <p>Nothing you do on X is sent anywhere. No analytics, no tracking pixels, no crash reporting. Your browsing
-            is
-            entirely your own.</p>
-        </div>
-        <div class="privacy-card fade-up">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--x-blue)"
-            style="margin-bottom:14px;display:block;">
-            <path
-              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-          </svg>
-          <h3>One external request</h3>
-          <p>The only external request is to <span class="code-tag">cdn.syndication.twimg.com</span> — X's own public
-            API
-            — and only when you explicitly click the download button.</p>
-        </div>
-        <div class="privacy-card fade-up">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="#a855f7" style="margin-bottom:14px;display:block;">
-            <path
-              d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z" />
-          </svg>
-          <h3>Local storage only</h3>
-          <p>All counters, settings, language preference, and the blocked advertiser list live exclusively in <span
-              class="code-tag">chrome.storage.local</span>. On your device. Under your control.</p>
-        </div>
-      </div>
-    </section>
-
-    <div class="section-divider"></div>
-
-    <!-- INSTALL -->
-    <section id="install" style="padding-bottom:60px;">
-      <div class="section-label">Installation</div>
-      <h2 class="section-title">Up in 60 seconds.</h2>
-      <p class="section-sub">Not on the Chrome Web Store — installed directly in Developer Mode. Takes less than a
-        minute.
-      </p>
-
-      <div class="install-box fade-up">
-        <div class="install-steps">
-          <h3 style="font-size:16px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px;">Install Developer Mode
-          </h3>
-          <div class="install-step">
-            <div class="install-step-num">1</div>
-            <div class="install-step-text">Clone or download the repository as a ZIP</div>
-          </div>
-          <div class="install-step">
-            <div class="install-step-num">2</div>
-            <div class="install-step-text">Open Chrome and navigate to <span
-                class="code-tag">chrome://extensions/</span>
-            </div>
-          </div>
-          <div class="install-step">
-            <div class="install-step-num">3</div>
-            <div class="install-step-text">Toggle <strong>Developer mode</strong> on (top-right corner)</div>
-          </div>
-          <div class="install-step">
-            <div class="install-step-num">4</div>
-            <div class="install-step-text">Click <strong>Load unpacked</strong> and select the extracted folder</div>
-          </div>
-          <div class="install-step">
-            <div class="install-step-num">5</div>
-            <div class="install-step-text">Visit <span class="code-tag">x.com</span>, refresh the page, and enjoy</div>
-          </div>
-        </div>
-
-        <div class="install-cta">
-          <h3>Free &amp; Open Source</h3>
-          <p>MIT Licensed · No account required</p>
-          <a href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank" class="btn-primary"
-            style="font-size:14px;padding:13px 28px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.74-1.33-1.74-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.005 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z" />
-            </svg>
-            View on GitHub
-          </a>
-          <div style="margin-top:14px;font-size:12px;color:var(--t3);">Part of Paracci Browser Tools</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FOOTER -->
-    <footer>
-      <a href="#" class="footer-brand">
-        <svg viewBox="0 0 24 24">
+  <header class="site-header">
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a class="site-brand" href="#top" aria-label="X Auto Ad Blocker home">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
         </svg>
-        X Ad Blocker · Paracci Browser Tools
+        <span>X Ad Blocker</span>
       </a>
-      <div class="footer-links">
-        <a href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank" class="footer-link">GitHub</a>
-        <a href="https://github.com/Paracci/x-auto-ad-blocker/blob/main/LICENSE" target="_blank" class="footer-link">MIT
-          License</a>
-        <a href="https://github.com/paracci" target="_blank" class="footer-link">Paracci</a>
+
+      <div class="nav-links" id="primary-navigation">
+        <a class="nav-link" href="#features">Features</a>
+        <a class="nav-link" href="#how-it-works">How it works</a>
+        <a class="nav-link" href="#privacy">Privacy</a>
+        <a class="nav-cta" href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank"
+          rel="noopener noreferrer">Get it on GitHub</a>
       </div>
-    </footer>
 
-    <script>
-      function animateVal(el, end, dur) {
-        let start = null;
-        const step = (ts) => {
-          if (!start) start = ts;
-          const p = Math.min((ts - start) / dur, 1);
-          const ease = 1 - Math.pow(1 - p, 3);
-          el.textContent = Math.floor(ease * end);
-          if (p < 1) requestAnimationFrame(step);
-          else el.textContent = end;
-        };
-        requestAnimationFrame(step);
-      }
+      <button class="nav-menu-toggle" type="button" data-menu-toggle aria-expanded="false"
+        aria-controls="primary-navigation">
+        <span>Menu</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+        </svg>
+      </button>
+    </nav>
+  </header>
 
-      const counterObserver = new IntersectionObserver((entries, obs) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            if (e.target.id === 'popupBlocked' || e.target.closest('.hero-visual')) {
-              const b = document.getElementById('popupBlocked');
-              const d = document.getElementById('popupDownloaded');
-              if (b) animateVal(b, 247, 1500);
-              if (d) animateVal(d, 38, 1200);
-            } else {
-              const b = document.getElementById('demoBlocked');
-              const d = document.getElementById('demoDown');
-              if (b) animateVal(b, 247, 1200);
-              if (d) animateVal(d, 38, 1000);
-            }
-            obs.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.3 });
+  <main id="main-content" tabindex="-1">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="hero-layout">
+        <div class="hero-content">
+          <p class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Open source <span aria-hidden="true">·</span> Zero telemetry
+          </p>
+          <h1 id="hero-title">Block ads.<br><span class="accent">Download media.</span><br>Own your feed.</h1>
+          <p class="hero-sub">
+            A lightweight Chrome extension for X that detects sponsored posts, lets you choose between hiding a post
+            or blocking its account, and saves videos, GIFs, and images locally.
+          </p>
 
-      const statsEl = document.getElementById('demoBlocked');
-      if (statsEl) counterObserver.observe(statsEl.closest('.feature-card') || statsEl);
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank"
+              rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.74-1.33-1.74-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.005 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+              View on GitHub
+            </a>
+            <a class="button button-secondary" href="#features">
+              Explore features
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+              </svg>
+            </a>
+          </div>
 
-      const popupStatsEl = document.getElementById('popupBlocked');
-      if (popupStatsEl) counterObserver.observe(popupStatsEl.closest('.ext-card') || popupStatsEl);
+          <dl class="hero-facts">
+            <div class="hero-fact">
+              <dt>11</dt>
+              <dd>Languages supported</dd>
+            </div>
+            <div class="hero-fact">
+              <dt>Local</dt>
+              <dd>Settings and history</dd>
+            </div>
+            <div class="hero-fact">
+              <dt>0</dt>
+              <dd>Third-party telemetry</dd>
+            </div>
+          </dl>
+        </div>
 
-      const fadeObserver = new IntersectionObserver((entries) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible');
-            fadeObserver.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.15, rootMargin: "0px 0px -50px 0px" });
+        <div class="hero-visual">
+          <p class="sr-only">Presentation preview of the extension's Home screen. The controls below are decorative
+            and are not interactive.</p>
+          <div class="browser-frame" aria-hidden="true">
+            <div class="browser-bar">
+              <span class="browser-dot browser-dot-red"></span>
+              <span class="browser-dot browser-dot-yellow"></span>
+              <span class="browser-dot browser-dot-green"></span>
+              <span class="browser-url">x.com <span aria-hidden="true">—</span> X Ad Blocker active</span>
+            </div>
 
-      document.querySelectorAll('.fade-up').forEach(el => fadeObserver.observe(el));
+            <div class="extension-preview">
+              <div class="preview-main">
+                <div class="preview-header">
+                  <div class="preview-brand">
+                    <svg class="preview-brand-mark" viewBox="0 0 24 24">
+                      <path
+                        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+                    </svg>
+                    <span>X Ad Blocker</span>
+                  </div>
+                  <span class="preview-settings-glyph">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                    </svg>
+                  </span>
+                </div>
 
-      const stepObserver = new IntersectionObserver((entries) => {
-        entries.forEach((e, i) => {
-          if (e.isIntersecting) {
-            setTimeout(() => e.target.classList.add('visible'), i * 80);
-            stepObserver.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.1, rootMargin: "0px 0px -30px 0px" });
+                <div class="preview-card preview-status-card">
+                  <div>
+                    <div class="preview-label">Protection</div>
+                    <div class="preview-status">
+                      <span class="status-dot" aria-hidden="true"></span>
+                      <span>Active</span>
+                    </div>
+                  </div>
+                  <span class="preview-toggle preview-toggle-on" aria-hidden="true"><span></span></span>
+                </div>
 
-      document.querySelectorAll('.step-row').forEach(el => stepObserver.observe(el));
-    </script>
+                <div class="preview-card preview-stats-card">
+                  <div class="preview-stats-grid">
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Blocked accounts</span>
+                    </div>
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Ad accounts</span>
+                    </div>
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Promoted accounts</span>
+                    </div>
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Filtered posts</span>
+                    </div>
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Hidden posts</span>
+                    </div>
+                    <div class="preview-stat">
+                      <strong>0</strong>
+                      <span>Downloaded</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-card preview-media-card">
+                  <div>
+                    <div class="preview-label">Media Downloader</div>
+                    <span class="preview-sublabel">Videos, GIFs &amp; images</span>
+                  </div>
+                  <span class="preview-badge">Active</span>
+                </div>
+              </div>
+
+              <aside class="preview-sidebar">
+                <div class="preview-nav">
+                  <div class="preview-nav-item preview-nav-item-active">
+                    <svg class="preview-nav-icon" viewBox="0 0 24 24">
+                      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                    </svg>
+                    <span>Home</span>
+                  </div>
+                  <div class="preview-nav-item">
+                    <svg class="preview-nav-icon" viewBox="0 0 24 24">
+                      <path
+                        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                    </svg>
+                    <span>Settings</span>
+                  </div>
+                  <div class="preview-nav-item">
+                    <svg class="preview-nav-icon" viewBox="0 0 24 24">
+                      <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
+                    </svg>
+                    <span>Blocked</span>
+                  </div>
+                  <div class="preview-nav-item">
+                    <svg class="preview-nav-icon" viewBox="0 0 24 24">
+                      <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                    </svg>
+                    <span>About</span>
+                  </div>
+                </div>
+                <div class="preview-credit">
+                  <span>Crafted by</span>
+                  <strong>Paracci</strong>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-divider" aria-hidden="true"></div>
+
+    <section class="section-shell" id="features" aria-labelledby="features-title">
+      <div class="section-heading">
+        <p class="section-kicker">Features</p>
+        <h2 class="section-title" id="features-title">Everything you need.<br>Nothing you don't.</h2>
+        <p class="section-sub">A focused toolkit for a cleaner feed, deliberate account controls, and simple media
+          downloads.</p>
+      </div>
+
+      <div class="features-grid">
+        <article class="feature-card feature-card-wide reveal">
+          <div class="feature-copy">
+            <div class="feature-icon feature-icon-blue" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" />
+              </svg>
+            </div>
+            <h3>Ad handling on your terms</h3>
+            <p>Regular ads are detected in real time. Promoted posts are optional, and every match can either hide the
+              post locally or block the advertiser account through X's native flow.</p>
+          </div>
+
+          <div class="ad-demo" aria-hidden="true">
+            <div class="ad-demo-post">
+              <div class="ad-demo-topline">
+                <span class="avatar-placeholder">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+                  </svg>
+                </span>
+                <span class="ad-demo-author">Sponsored account</span>
+                <span class="ad-label">Ad</span>
+              </div>
+              <div class="ad-demo-lines">
+                <span></span>
+                <span></span>
+                <span class="ad-demo-line-short"></span>
+              </div>
+              <div class="ad-demo-actionbar">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="ad-demo-result">
+              <div class="result-check">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+              </div>
+              <div>
+                <strong>Match handled</strong>
+                <span>Choose account block or local hide</span>
+              </div>
+              <div class="mode-pills">
+                <span class="mode-pill mode-pill-active">Block account</span>
+                <span class="mode-pill">Hide post</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-media reveal">
+          <div class="feature-icon feature-icon-blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16.59l-5.7-5.7 1.41-1.42L11 12.76V3h2v9.76l3.3-3.3 1.41 1.42L12 16.59zM3 21v-3.5h2V19h14v-1.5h2V21H3z" />
+            </svg>
+          </div>
+          <h3>Media downloader</h3>
+          <p>Download the highest-bitrate MP4, convert X GIFs, or save full-resolution images and multi-photo posts
+            with clean filenames.</p>
+
+          <div class="media-demo" aria-hidden="true">
+            <div class="media-demo-topline">
+              <span class="avatar-placeholder">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z" />
+                </svg>
+              </span>
+              <div>
+                <strong>X User</strong>
+                <span>@xuser · 2h</span>
+              </div>
+            </div>
+            <div class="media-thumbnail">
+              <span class="media-play">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </span>
+              <span class="media-quality">Highest bitrate</span>
+            </div>
+            <div class="media-demo-footer">
+              <span>Video · MP4</span>
+              <span class="download-chip">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 16.59 5.41 10 4 11.41l8 8 8-8L18.59 10zM11 3h2v12h-2z" />
+                </svg>
+                Download
+              </span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-controls reveal">
+          <div class="feature-icon feature-icon-green" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M19.14 12.94c.04-.3.06-.61.06-.94.02-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6 1.62 3.6 3.6 3.6 3.6z" />
+            </svg>
+          </div>
+          <h3>Personal filters, local control</h3>
+          <p>Hide posts containing a word, phrase, hashtag, or handle. Filter matches stay local and never trigger an
+            account block.</p>
+
+          <div class="settings-demo" aria-hidden="true">
+            <div class="settings-demo-heading">Personal Filters</div>
+            <div class="settings-demo-subheading">Hide posts containing...</div>
+            <div class="filter-input">
+              <span>#giveaway</span>
+              <span>crypto scam</span>
+              <span>@spamaccount</span>
+            </div>
+            <div class="settings-demo-actions">
+              <span>Saved locally</span>
+              <span class="save-chip">Save filters</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-stats reveal">
+          <div class="feature-icon feature-icon-blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 3h2v18H5V3zm6 5h2v13h-2V8zm6-3h2v16h-2V5z" />
+            </svg>
+          </div>
+          <h3>One popup, full visibility</h3>
+          <p>See category-level stats, review blocked advertiser history, export or import local data, and keep every
+            setting within reach.</p>
+
+          <div class="stats-history-demo" aria-hidden="true">
+            <div class="mini-stat-grid">
+              <div><strong>0</strong><span>Blocked accounts</span></div>
+              <div><strong>0</strong><span>Filtered posts</span></div>
+              <div><strong>0</strong><span>Hidden posts</span></div>
+              <div><strong>0</strong><span>Downloaded</span></div>
+            </div>
+            <div class="history-demo-empty">No advertisers blocked yet</div>
+            <div class="history-demo-tools">
+              <span>Export data</span>
+              <span>Import data</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-languages reveal">
+          <div class="feature-icon feature-icon-purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12.87 15.07l-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17a15.1 15.1 0 0 1-3.3 4.47A15.5 15.5 0 0 1 6.6 7H4.6c.7 1.66 1.68 3.18 2.88 4.47l-4.9 4.83L4 17.72l4.9-4.9 3.05 3.05.92-.8zM19 10h-2l-5 12h2l1.25-3h5.5L22 22h2l-5-12zm-3.08 7L18 12.43 20.08 17h-4.16z" />
+            </svg>
+          </div>
+          <h3>11 languages, zero flash</h3>
+          <p>English, Türkçe, Deutsch, Français, Español, Português, Italiano, Русский, 日本語, 한국어, and 中文.
+            Browser detection and manual override are built in.</p>
+
+          <div class="language-demo" aria-hidden="true">
+            <div class="language-demo-label">Interface language</div>
+            <div class="language-chips">
+              <span class="language-chip language-chip-active">English</span>
+              <span class="language-chip">Türkçe</span>
+              <span class="language-chip">Deutsch</span>
+              <span class="language-chip">日本語</span>
+              <span class="language-chip">中文</span>
+              <span class="language-chip language-chip-more">+6</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-settings reveal">
+          <div class="feature-icon feature-icon-green" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm2.07-7.25-.9.92A3.4 3.4 0 0 0 13 13.25V14h-2v-.92a4.3 4.3 0 0 1 1.27-3l1.24-1.26A1.6 1.6 0 0 0 14 7.7a2 2 0 0 0-4 0H8a4 4 0 0 1 8 0 3.42 3.42 0 0 1-.93 2.05z" />
+            </svg>
+          </div>
+          <h3>Settings that match the extension</h3>
+          <p>Regular ad blocking, optional promoted posts, action mode, toast notifications, media-only display, and
+            language settings are all visible in one place.</p>
+
+          <div class="settings-panel-demo" aria-hidden="true">
+            <div class="settings-panel-section">
+              <div class="settings-panel-title">Ad Blocking</div>
+              <div class="settings-panel-row">
+                <span>Auto-block advertisers</span>
+                <span class="preview-toggle preview-toggle-on"><span></span></span>
+              </div>
+              <div class="settings-panel-row">
+                <span>Auto-block promoted posts</span>
+                <span class="preview-toggle"><span></span></span>
+              </div>
+              <div class="settings-panel-row">
+                <span>When a match is found</span>
+                <span class="select-chip">Block account on X</span>
+              </div>
+            </div>
+            <div class="settings-panel-section settings-panel-tools">
+              <span>Backup &amp; data</span>
+              <span class="tool-chip">Export</span>
+              <span class="tool-chip">Import</span>
+              <span class="tool-chip tool-chip-danger">Reset</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="section-divider" aria-hidden="true"></div>
+
+    <section class="section-shell" id="how-it-works" aria-labelledby="how-title">
+      <div class="section-heading">
+        <p class="section-kicker">How it works</p>
+        <h2 class="section-title" id="how-title">Smart. Silent. Surgical.</h2>
+        <p class="section-sub">The extension works with X's visible interface and user-triggered media requests. No
+          filter lists to maintain and no background telemetry.</p>
+      </div>
+
+      <div class="how-layout">
+        <div class="about-preview" aria-hidden="true">
+          <div class="about-preview-main">
+            <div class="about-preview-heading">
+              <span class="about-preview-title">About</span>
+            </div>
+            <div class="about-preview-card">
+              <strong>Built for a cleaner feed</strong>
+              <p>Detect sponsored posts, choose the action, and download media without handing your settings to a
+                server.</p>
+            </div>
+            <div class="about-preview-card">
+              <strong>How it works</strong>
+              <ul>
+                <li>Detects ad labels with a debounced observer</li>
+                <li>Hides or blocks according to your setting</li>
+                <li>Applies personal filters locally</li>
+                <li>Downloads media when you ask</li>
+              </ul>
+            </div>
+            <div class="about-preview-card">
+              <strong>Privacy</strong>
+              <p>No third-party analytics or telemetry. Settings and history stay in <code>chrome.storage.local</code>.
+              </p>
+            </div>
+          </div>
+          <div class="about-preview-sidebar">
+            <span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" /></svg>
+              <b>Home</b>
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" /></svg>
+              Settings
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z" /></svg>
+              Blocked
+            </span>
+            <span class="about-preview-active">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" /></svg>
+              About
+            </span>
+            <small>Paracci</small>
+          </div>
+        </div>
+
+        <div class="steps-list">
+          <div class="step-row reveal">
+            <span class="step-number">01</span>
+            <div>
+              <h3>Detects in real time</h3>
+              <p>A debounced <code>MutationObserver</code> watches for new tweets and checks exact ad labels outside
+                the tweet body.</p>
+            </div>
+          </div>
+          <div class="step-row reveal">
+            <span class="step-number">02</span>
+            <div>
+              <h3>Respects the selected action</h3>
+              <p>Use <strong>Block account on X</strong> for a lasting account-level action, or <strong>Hide post
+                  only</strong> for a local and reversible choice.</p>
+            </div>
+          </div>
+          <div class="step-row reveal">
+            <span class="step-number">03</span>
+            <div>
+              <h3>Keeps local history useful</h3>
+              <p>Unique advertiser handles, categories, counters, filters, and blocked history are stored locally and
+                rendered in the popup.</p>
+            </div>
+          </div>
+          <div class="step-row reveal">
+            <span class="step-number">04</span>
+            <div>
+              <h3>Downloads only on click</h3>
+              <p>The background worker resolves tweet media through X's public syndication endpoint only after you press
+                the download button, then fetches the selected file.</p>
+            </div>
+          </div>
+          <div class="step-row reveal">
+            <span class="step-number">05</span>
+            <div>
+              <h3>Handles X's dynamic UI</h3>
+              <p>Hydration-aware retries, temporary interaction shielding, and rescan-on-reenable keep the experience
+                stable as the feed changes.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-divider" aria-hidden="true"></div>
+
+    <section class="section-shell" id="privacy" aria-labelledby="privacy-title">
+      <div class="section-heading">
+        <p class="section-kicker">Privacy</p>
+        <h2 class="section-title" id="privacy-title">Zero telemetry.<br>Clear boundaries.</h2>
+        <p class="section-sub">The extension is designed to keep your controls and history on your device while being
+          precise about the X requests needed for media downloads.</p>
+      </div>
+
+      <div class="privacy-grid">
+        <article class="privacy-card reveal">
+          <div class="privacy-icon privacy-icon-green" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
+            </svg>
+          </div>
+          <h3>No third-party telemetry</h3>
+          <p>No analytics, tracking pixels, crash reporting, or settings transmission. The extension does not send
+            your X activity to a third party.</p>
+        </article>
+        <article class="privacy-card reveal">
+          <div class="privacy-icon privacy-icon-blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg>
+          </div>
+          <h3>Only when you download</h3>
+          <p>When you click download, the extension uses X's public syndication endpoint to resolve the best file, then
+            fetches the selected media from X's media hosts. Nothing is sent to a third party.</p>
+        </article>
+        <article class="privacy-card reveal">
+          <div class="privacy-icon privacy-icon-purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.89-2-2-2h-1V1h-2zm3 18H5V8h14v11z" />
+            </svg>
+          </div>
+          <h3>Local storage only</h3>
+          <p>Settings, filters, counters, language preference, and blocked history live in
+            <code>chrome.storage.local</code> on your device.</p>
+        </article>
+      </div>
+    </section>
+
+    <div class="section-divider" aria-hidden="true"></div>
+
+    <section class="section-shell install-section" id="install" aria-labelledby="install-title">
+      <div class="section-heading">
+        <p class="section-kicker">Installation</p>
+        <h2 class="section-title" id="install-title">Up in a minute.</h2>
+        <p class="section-sub">The extension is distributed from GitHub and installed directly in Chrome Developer
+          Mode.</p>
+      </div>
+
+      <div class="install-panel reveal">
+        <div class="install-steps">
+          <h3>Install in Developer Mode</h3>
+          <ol>
+            <li><span>1</span><p>Clone or download this repository as a ZIP.</p></li>
+            <li><span>2</span><p>Open <code>chrome://extensions/</code> in Chrome.</p></li>
+            <li><span>3</span><p>Turn on <strong>Developer mode</strong>.</p></li>
+            <li><span>4</span><p>Select <strong>Load unpacked</strong> and choose the extracted folder.</p></li>
+            <li><span>5</span><p>Open <code>x.com</code>, refresh, and browse with your chosen settings.</p></li>
+          </ol>
+        </div>
+        <div class="install-aside">
+          <div class="install-aside-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.74-1.33-1.74-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.005 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z" />
+            </svg>
+          </div>
+          <h3>Free &amp; open source</h3>
+          <p>MIT licensed. No account required.</p>
+          <a class="button button-primary" href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank"
+            rel="noopener noreferrer">View repository</a>
+          <small>Part of Paracci Browser Tools</small>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="footer-brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+      </svg>
+      <span>X Ad Blocker <span aria-hidden="true">·</span> Paracci Browser Tools</span>
+    </a>
+    <nav class="footer-links" aria-label="Footer navigation">
+      <a href="https://github.com/Paracci/x-auto-ad-blocker" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://github.com/Paracci/x-auto-ad-blocker/blob/main/LICENSE" target="_blank"
+        rel="noopener noreferrer">MIT License</a>
+      <a href="https://github.com/paracci" target="_blank" rel="noopener noreferrer">Paracci</a>
+    </nav>
+  </footer>
+
+  <script src="landing.js" defer></script>
 </body>
 
 </html>

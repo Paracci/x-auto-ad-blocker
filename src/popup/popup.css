@@ -1,22 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
-
-:root {
-    --x-bg-main: #000000;
-    --x-bg-secondary: #0e0e0e;
-    --x-bg-card: #16181c;
-    --x-bg-card-hover: #1d1f23;
-    --x-border: rgba(255,255,255,0.08);
-
-    --x-blue: #1d9bf0;
-    --x-blue-hover: #1a8cd8;
-    --x-blue-glow: rgba(29,155,240,0.15);
-    --x-red: #f4212e;
-    --x-green: #00ba7c;
-
-    --x-text-primary: #e7e9ea;
-    --x-text-secondary: #71767b;
-    --x-text-muted: #3e4144;
-}
+@import url('../shared/theme.css');
 
 * {
     box-sizing: border-box;
